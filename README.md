@@ -14,7 +14,7 @@ Winget Updater takes the headache out of keeping your software up-to-date. It si
 
 ## Installation
 
-1.  **Download the latest release** from the [Releases tab](releases/latest) in the sidebar.
+1.  **Download the latest release** from the [Releases tab](../../releases/latest) in the sidebar.
 2.  Extract the files.
 3.  Double-click `install-winget-updater.bat`.
     -   _Note: This will ask for administrator permissions to set up the automation._
