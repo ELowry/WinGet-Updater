@@ -37,8 +37,12 @@ if (Test-Path $RegistryKey) {
 Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
 Write-Host " -> Scheduled task removed." -ForegroundColor Green
 
-if (Test-Path $StartMenuLink) { Remove-Item -Path $StartMenuLink -Force -ErrorAction SilentlyContinue }
-if (Test-Path $StartMenuFolder) { Remove-Item -Path $StartMenuFolder -Recurse -Force -ErrorAction SilentlyContinue }
+if (Test-Path $StartMenuLink) {
+	Remove-Item -Path $StartMenuLink -Force -ErrorAction SilentlyContinue
+}
+if (Test-Path $StartMenuFolder) {
+	Remove-Item -Path $StartMenuFolder -Recurse -Force -ErrorAction SilentlyContinue
+}
 Write-Host " -> Shortcuts removed." -ForegroundColor Green
 
 Write-Host " -> Removing application files..." -ForegroundColor Yellow

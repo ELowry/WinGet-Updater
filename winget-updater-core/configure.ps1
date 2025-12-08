@@ -10,7 +10,7 @@ param(
 )
 
 $AppName = "Winget Updater"
-$AppVersion = "1.0.0"
+$AppVersion = "1.0.1"
 $InstallDir = "$env:LOCALAPPDATA\WingetUpdater"
 $SourceDir = $PSScriptRoot
 
@@ -19,14 +19,14 @@ Write-Host "--------------------" -ForegroundColor DarkGray
 
 Write-Host "Installing application..." -ForegroundColor Yellow
 
-if (-not (Test-Path $InstallDir)) { 
-	New-Item -Path $InstallDir -ItemType Directory | Out-Null 
+if (-not (Test-Path $InstallDir)) {
+	New-Item -Path $InstallDir -ItemType Directory | Out-Null
 }
 
 if (Test-Path $InstallDir) {
-	Get-ChildItem -Path $InstallDir | Where-Object { 
-		$_.Name -ne "winget-updater-data.json" -and 
-		$_.Name -ne "winget-updater-log.txt" 
+	Get-ChildItem -Path $InstallDir | Where-Object {
+		$_.Name -ne "winget-updater-data.json" -and
+		$_.Name -ne "winget-updater-log.txt"
 	} | Remove-Item -Recurse -Force
 }
 
@@ -43,12 +43,14 @@ $WshShell = New-Object -comObject WScript.Shell
 $Shortcut = $WshShell.CreateShortcut($LinkPath)
 $Shortcut.TargetPath = "cmd.exe"
 $Shortcut.Arguments = "/c start `"`" /min `"$InstallDir\launcher.bat`" -Forced"
-$Shortcut.IconLocation = "shell32.dll,238" 
+$Shortcut.IconLocation = "shell32.dll,238"
 $Shortcut.Save()
 
 # Register in "Add/Remove Programs" (ARP)
 $UninstallKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\WingetUpdater"
-if (-not (Test-Path $UninstallKey)) { New-Item -Path $UninstallKey -Force | Out-Null }
+if (-not (Test-Path $UninstallKey)) {
+	New-Item -Path $UninstallKey -Force | Out-Null
+}
 
 $ArpValues = @{
 	"DisplayName"     = $AppName
@@ -75,15 +77,19 @@ if ($Unattended) {
 else {
 	$RunStartup = Read-Host "Run at system startup? (Y/n)"
 }
-if ([string]::IsNullOrWhiteSpace($RunStartup)) { $RunStartup = "y" }
+if ([string]::IsNullOrWhiteSpace($RunStartup)) {
+	$RunStartup = "y"
+}
 
 if ($Unattended) {
 	$RunWake = "n"
 }
 else {
-	$RunWake = Read-Host "Run on system wake/unlock? (y/N)" 
+	$RunWake = Read-Host "Run on system wake/unlock? (y/N)"
 }
-if ([string]::IsNullOrWhiteSpace($RunWake)) { $RunWake = "n" }
+if ([string]::IsNullOrWhiteSpace($RunWake)) {
+	$RunWake = "n"
+}
 
 $TaskName = "Winget Updater"
 Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
