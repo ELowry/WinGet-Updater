@@ -16,10 +16,10 @@ DisableReadyPage=yes
 DisableFinishedPage=yes
 
 [Files]
-Source: "winget-updater-core\winget-updater.ps1"; DestDir: "{tmp}"; Flags: ignoreversion
-Source: "winget-updater-core\configure.ps1"; DestDir: "{tmp}"; Flags: ignoreversion
-Source: "winget-updater-core\uninstall.ps1"; DestDir: "{tmp}"; Flags: ignoreversion
-Source: "winget-updater-core\launcher.bat"; DestDir: "{tmp}"; Flags: ignoreversion
+Source: "..\winget-updater-core\winget-updater.ps1"; DestDir: "{tmp}"; Flags: ignoreversion
+Source: "..\winget-updater-core\configure.ps1"; DestDir: "{tmp}"; Flags: ignoreversion
+Source: "..\winget-updater-core\uninstall.ps1"; DestDir: "{tmp}"; Flags: ignoreversion
+Source: "..\winget-updater-core\launcher.bat"; DestDir: "{tmp}"; Flags: ignoreversion
 
 [Tasks]
 Name: "startup"; Description: "Run automatically at system startup"; GroupDescription: "Automation:"; Flags: unchecked
