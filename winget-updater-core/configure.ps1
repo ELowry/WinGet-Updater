@@ -51,10 +51,10 @@ try {
 	if ($null -eq $PreviousVersion) {
 		Write-Host "Installing Winget Updater v$AppVersion" -ForegroundColor Cyan
 	}
- elseif ($PreviousVersion -eq $AppVersion) {
+	elseif ($PreviousVersion -eq $AppVersion) {
 		Write-Host "Reinstalling Winget Updater v$AppVersion" -ForegroundColor Cyan
 	}
- else {
+	else {
 		Write-Host "Upgrading Winget Updater: v$PreviousVersion → v$AppVersion" -ForegroundColor Cyan
 	}
 	Write-Host "--------------------" -ForegroundColor DarkGray
@@ -118,13 +118,13 @@ try {
 	$StartupDefault = if ($PrevStartup -eq 1) {
 		"Y"
 	}
- else {
+	else {
 		"n"
 	}
 	$WakeDefault = if ($PrevWake -eq 1) {
 		"Y"
 	}
- else {
+	else {
 		"n"
 	}
 
