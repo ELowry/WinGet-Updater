@@ -14,11 +14,23 @@ Winget Updater takes the headache out of keeping your software up-to-date. It si
 
 ## Installation
 
-1. **Download the latest release** from the [Releases tab](../../releases/latest) in the sidebar.
+1. **Download the latest release** from the [Releases tab](../../releases/latest).
+2. Choose your preferred method:
+
+### Option 1: Installer (Recommended)
+
+1. Download `WingetUpdaterSetup.exe`.
+2. Run the installer.
+3. Choose your automation settings (Run at Startup / Wake) during setup.
+4. That's it!
+
+### Option 2: Portable / Zip
+
+1. Download the Source code (zip) or the release zip.
 2. Extract the files.
 3. Double-click `install-winget-updater.bat`.
    - _Note: This will ask for administrator permissions to set up the automation._
-4. Follow the simple on-screen prompts to choose when you want updates to run.
+4. Follow the simple on-screen prompts to choose your automation settings (Run at Startup / Wake).
 5. _You can now delete the downloaded files._
 
 ## Usage
