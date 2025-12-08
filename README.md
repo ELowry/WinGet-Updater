@@ -41,7 +41,7 @@ For power users who prefer the terminal, after installation you can run:
 
 **Command Line Options:**
 
-- `-Silent`: Runs without any popups (perfect for background tasks).
+- `-Silent`: Runs without any popups unless the script encounters unknown apps.
 - `-Minimal`: Shows only the most important status messages.
 - `-Forced`: Checks for updates even if it has already run today.
 - `-NoClear`: Prevents clearing the console when the script starts.
