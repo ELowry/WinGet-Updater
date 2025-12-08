@@ -4,6 +4,7 @@
 	Copyright 2025 Eric Lowry
 	Licensed under the MIT License.
 #>
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSAvoidUsingWriteHost", "")]
 param(
 	[switch]$Unattended
 )
@@ -68,10 +69,20 @@ Write-Host " -> Shortcuts updated." -ForegroundColor Green
 
 Write-Host "Automation Settings" -ForegroundColor Cyan
 
-$RunStartup = Read-Host "Run at system startup? (Y/n)"
+if ($Unattended) {
+	$RunStartup = "y"
+}
+else {
+	$RunStartup = Read-Host "Run at system startup? (Y/n)"
+}
 if ([string]::IsNullOrWhiteSpace($RunStartup)) { $RunStartup = "y" }
 
-$RunWake = Read-Host "Run on system wake/unlock? (y/N)" 
+if ($Unattended) {
+	$RunWake = "n"
+}
+else {
+	$RunWake = Read-Host "Run on system wake/unlock? (y/N)" 
+}
 if ([string]::IsNullOrWhiteSpace($RunWake)) { $RunWake = "n" }
 
 $TaskName = "Winget Updater"
@@ -155,7 +166,12 @@ else {
 
 Write-Host "`nSetup complete." -ForegroundColor Green
 
-$RunNow = Read-Host "Run Winget Updater now? (Y/n)"
+if ($Unattended) {
+	$RunNow = "y"
+}
+else {
+	$RunNow = Read-Host "Run Winget Updater now? (Y/n)"
+}
 if ([string]::IsNullOrWhiteSpace($RunNow) -or $RunNow -eq "y") {
 	Write-Host "Launching Winget Updater..." -ForegroundColor Cyan
 	Start-Process -FilePath "cmd.exe" -ArgumentList "/c start `"`" /min `"$InstallDir\launcher.bat`" -Forced" -WindowStyle Hidden

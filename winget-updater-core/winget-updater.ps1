@@ -5,6 +5,7 @@
 	Licensed under the MIT License.
 #>
 [CmdletBinding()]
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSAvoidUsingWriteHost", "")]
 param(
 	[switch]$NoClear,
 	[switch]$Forced,

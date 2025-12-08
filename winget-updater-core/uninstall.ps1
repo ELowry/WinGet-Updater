@@ -5,6 +5,10 @@
 	Licensed under the MIT License.
 #>
 
+[CmdletBinding()]
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSAvoidUsingWriteHost", "")]
+param()
+
 $AppName = "Winget Updater"
 $InstallDir = "$env:LOCALAPPDATA\WingetUpdater"
 $StartMenuLink = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\$AppName.lnk"
