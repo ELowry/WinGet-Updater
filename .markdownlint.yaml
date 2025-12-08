@@ -1,0 +1,14 @@
+# .markdownlint.yaml
+# Configuration to make markdownlint play nice with Prettier
+
+# VS Code and Prettier often handle line wrapping automatically.
+# Enforcing a hard limit conflicts with this and can be annoying for valid long URLs.
+MD013: false # Line length
+
+# Badges (images) are often used at the very top of READMEs before the H1 title.
+# This rule is relaxed to allow that pattern.
+MD041: false # First line in a file should be a top-level heading
+
+# Prettier usually indents lists with 2 spaces or tabs, which can trigger this.
+# Disabling this to defer to Prettier's formatting style.
+MD030: false # Spaces after list markers
