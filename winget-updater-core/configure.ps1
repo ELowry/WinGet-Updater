@@ -114,7 +114,7 @@ if ($RunWake -eq "y") {
 }
 
 $SafeInstallDir = $InstallDir.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("`"", "&quot;")
-$ArgString = "/c start /min &quot;&quot; &quot;$SafeInstallDir\launcher.bat&quot;"
+$ArgString = "/c start /min &quot;&quot; &quot;$SafeInstallDir\launcher.bat&quot; -Minimal"
 $User = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
 
 $TaskXml = @"
