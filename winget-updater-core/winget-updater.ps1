@@ -153,7 +153,7 @@ Function Show-EditMode {
 	}
 }
 
-Function Get-WingetUpdates {
+Function Get-WingetUpdate {
 	Write-Status "Checking for available updates..." -Type Info
 	Write-Log "Checking for winget updates."
 	try {
@@ -388,7 +388,7 @@ if (-not $NoClear -and -not $Silent -and -not $Minimal) { Clear-Host }
 
 Show-Header
 
-$allUpdates = Get-WingetUpdates
+$allUpdates = Get-WingetUpdate
 
 $updatesToForce = @($allUpdates | Where-Object { $_.Id -and $forcelist -contains $_.Id })
 $blockedUpdates = @($allUpdates | Where-Object { $_.Id -and $blocklist -contains $_.Id })
