@@ -30,9 +30,9 @@ Name: "wake"; Description: "Run automatically when system wakes or unlocks"; Gro
 function GetParams(Param: String): String;
 begin
   Result := '-Unattended';
-  if IsTaskSelected('startup') then
+  if WizardIsTaskSelected('startup') then
     Result := Result + ' -EnableStartup';
-  if IsTaskSelected('wake') then
+  if WizardIsTaskSelected('wake') then
     Result := Result + ' -EnableWake';
 end;
 
