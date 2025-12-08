@@ -1,6 +1,6 @@
 [Setup]
 AppName=WinGet Updater
-AppVersion=1.0
+AppVersion=1.1.3
 DefaultDirName={tmp}\WingetUpdaterInstaller
 UsePreviousAppDir=no
 PrivilegesRequired=admin

@@ -13,7 +13,7 @@ param(
 
 try {
 	$AppName = "Winget Updater"
-	$AppVersion = "1.1.2"
+	$AppVersion = "1.1.3"
 	$InstallDir = "$env:LOCALAPPDATA\WingetUpdater"
 	$SourceDir = $PSScriptRoot
 

@@ -1,4 +1,4 @@
-name: Build Installer
+name: Build and Release
 
 on:
   push:
@@ -6,8 +6,35 @@ on:
       - 'v*'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
+  verify:
+    name: Verify Code
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Run Markdown Lint
+        uses: DavidAnson/markdownlint-cli2-action@v16
+        with:
+          globs: '**/*.md'
+
+      - name: Run PSScriptAnalyzer
+        shell: powershell
+        run: |
+          $results = Invoke-ScriptAnalyzer -Path ".\winget-updater-core" -Recurse -Severity Error,Warning
+          if ($results) {
+              $results | Format-Table
+              exit 1
+          }
+          Write-Host "PSScriptAnalyzer passed successfully."
+
   build:
+    name: Build Installer and Create Release
+    needs: verify
     runs-on: windows-latest
 
     steps:
@@ -19,16 +46,17 @@ jobs:
         with:
           path: installer/setup.iss
 
-      - name: Upload Installer Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: WingetUpdaterSetup
-          path: installer/Output/WingetUpdaterSetup.exe
+      - name: Create Zip Archive
+        shell: pwsh
+        run: |
+          Compress-Archive -Path install-winget-updater.bat, winget-updater-core -DestinationPath WinGet-Updater.zip
 
-      - name: Create Release
+      - name: Create Draft Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v1
         with:
-          files: installer/Output/WingetUpdaterSetup.exe
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          files: |
+            installer/Output/WingetUpdaterSetup.exe
+            WinGet-Updater.zip
+          draft: true
+          generate_release_notes: true
