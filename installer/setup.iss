@@ -22,11 +22,49 @@ Source: "..\winget-updater-core\uninstall.ps1"; DestDir: "{tmp}"; Flags: ignorev
 Source: "..\winget-updater-core\launcher.bat"; DestDir: "{tmp}"; Flags: ignoreversion
 
 [Tasks]
-Name: "startup"; Description: "Run automatically at system startup"; GroupDescription: "Automation:"; Flags: unchecked
-Name: "wake"; Description: "Run automatically when system wakes or unlocks"; GroupDescription: "Automation:"; Flags: unchecked
+Name: "startup"; Description: "Run automatically at system startup"; GroupDescription: "Automation:"
+Name: "wake"; Description: "Run automatically when system wakes or unlocks"; GroupDescription: "Automation:"
 
 [Run]
 [Code]
+function ShouldCheckStartup: Boolean;
+var
+  ValueData: Cardinal;
+begin
+  Result := True;
+  if RegQueryDWordValue(HKEY_CURRENT_USER, 'Software\EricLowry\WingetUpdater\Config', 'AutoStartup', ValueData) then
+  begin
+    Result := (ValueData = 1);
+  end;
+end;
+
+function ShouldCheckWake: Boolean;
+var
+  ValueData: Cardinal;
+begin
+  Result := False;
+  if RegQueryDWordValue(HKEY_CURRENT_USER, 'Software\EricLowry\WingetUpdater\Config', 'AutoWake', ValueData) then
+  begin
+    Result := (ValueData = 1);
+  end;
+end;
+
+procedure CurPageChanged(CurPageID: Integer);
+var
+  I: Integer;
+begin
+  if CurPageID = wpSelectTasks then
+  begin
+    for I := 0 to WizardForm.TasksList.Items.Count - 1 do
+    begin
+      if Pos('startup', WizardForm.TasksList.ItemCaption[I]) > 0 then
+        WizardForm.TasksList.Checked[I] := ShouldCheckStartup
+      else if Pos('wake', WizardForm.TasksList.ItemCaption[I]) > 0 then
+        WizardForm.TasksList.Checked[I] := ShouldCheckWake;
+    end;
+  end;
+end;
+
 function GetParams(Param: String): String;
 begin
   Result := '-Unattended';

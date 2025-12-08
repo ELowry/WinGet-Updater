@@ -29,9 +29,27 @@ if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
 
 Write-Host "Uninstalling $AppName..." -ForegroundColor Cyan
 
+# Remove uninstall registry entry
 if (Test-Path $RegistryKey) {
 	Remove-Item -Path $RegistryKey -Recurse -Force -ErrorAction SilentlyContinue
-	Write-Host " -> Registry cleaned." -ForegroundColor Green
+	Write-Host " -> Uninstall registry cleaned." -ForegroundColor Green
+}
+
+# Remove configuration registry
+$ConfigKey = "HKCU:\Software\EricLowry\WingetUpdater"
+if (Test-Path $ConfigKey) {
+	Remove-Item -Path $ConfigKey -Recurse -Force -ErrorAction SilentlyContinue
+	Write-Host " -> Configuration registry cleaned." -ForegroundColor Green
+}
+
+# Remove parent key if empty
+$ParentKey = "HKCU:\Software\EricLowry"
+if (Test-Path $ParentKey) {
+	$children = Get-ChildItem -Path $ParentKey -ErrorAction SilentlyContinue
+	if ($null -eq $children -or $children.Count -eq 0) {
+		Remove-Item -Path $ParentKey -Force -ErrorAction SilentlyContinue
+		Write-Host " -> Parent registry key cleaned." -ForegroundColor Green
+	}
 }
 
 Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue

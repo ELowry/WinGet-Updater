@@ -11,13 +11,52 @@ param(
 	[switch]$EnableWake
 )
 
+$ConfigRegPath = "HKCU:\Software\EricLowry\WingetUpdater\Config"
+
+function Get-ConfigValue {
+	param([string]$Name, $Default)
+	try {
+		if (Test-Path $ConfigRegPath) {
+			$value = Get-ItemProperty -Path $ConfigRegPath -Name $Name -ErrorAction SilentlyContinue | Select-Object -ExpandProperty $Name
+			if ($null -ne $value) {
+				return $value
+			}
+		}
+	}
+	catch { }
+	return $Default
+}
+
+function Set-ConfigValue {
+	param([string]$Name, $Value)
+	if (-not (Test-Path $ConfigRegPath)) {
+		# Create parent keys if they don't exist
+		$parentPath = "HKCU:\Software\EricLowry"
+		if (-not (Test-Path $parentPath)) {
+			New-Item -Path $parentPath -Force | Out-Null
+		}
+		New-Item -Path $ConfigRegPath -Force | Out-Null
+	}
+	Set-ItemProperty -Path $ConfigRegPath -Name $Name -Value $Value -Force
+}
+
 try {
 	$AppName = "Winget Updater"
 	$AppVersion = "1.1.3"
 	$InstallDir = "$env:LOCALAPPDATA\WingetUpdater"
 	$SourceDir = $PSScriptRoot
 
-	Write-Host "Winget Updater Setup (v$AppVersion)" -ForegroundColor Cyan
+	$PreviousVersion = Get-ConfigValue -Name "InstalledVersion" -Default $null
+	
+	if ($null -eq $PreviousVersion) {
+		Write-Host "Installing Winget Updater v$AppVersion" -ForegroundColor Cyan
+	}
+ elseif ($PreviousVersion -eq $AppVersion) {
+		Write-Host "Reinstalling Winget Updater v$AppVersion" -ForegroundColor Cyan
+	}
+ else {
+		Write-Host "Upgrading Winget Updater: v$PreviousVersion → v$AppVersion" -ForegroundColor Cyan
+	}
 	Write-Host "--------------------" -ForegroundColor DarkGray
 
 	Write-Host "Installing application..." -ForegroundColor Yellow
@@ -49,7 +88,6 @@ try {
 	$Shortcut.IconLocation = "shell32.dll,238"
 	$Shortcut.Save()
 
-	# Register in "Add/Remove Programs" (ARP)
 	$UninstallKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\WingetUpdater"
 	if (-not (Test-Path $UninstallKey)) {
 		New-Item -Path $UninstallKey -Force | Out-Null
@@ -74,24 +112,74 @@ try {
 
 	Write-Host "Automation Settings" -ForegroundColor Cyan
 
-	if ($Unattended) {
-		$RunStartup = if ($EnableStartup) { "y" } else { "n" }
+	$PrevStartup = Get-ConfigValue -Name "AutoStartup" -Default 1
+	$PrevWake = Get-ConfigValue -Name "AutoWake" -Default 0
+
+	$StartupDefault = if ($PrevStartup -eq 1) {
+		"Y"
 	}
-	else {
-		$RunStartup = Read-Host "Run at system startup? (Y/n)"
+ else {
+		"n"
 	}
-	if ([string]::IsNullOrWhiteSpace($RunStartup)) {
-		$RunStartup = "y"
+	$WakeDefault = if ($PrevWake -eq 1) {
+		"Y"
+	}
+ else {
+		"n"
 	}
 
 	if ($Unattended) {
-		$RunWake = if ($EnableWake) { "y" } else { "n" }
+		$RunStartup = if ($EnableStartup) {
+			"y"
+		}
+		else {
+			"n"
+		}
 	}
 	else {
-		$RunWake = Read-Host "Run on system wake/unlock? (y/N)"
+		$RunStartup = Read-Host "Run at system startup? ($(
+			if ($StartupDefault -eq 'Y') {
+				'Y/n'
+			}
+			else {
+				'y/N'
+			}
+		))"
+	}
+	if ([string]::IsNullOrWhiteSpace($RunStartup)) {
+		$RunStartup = if ($StartupDefault -eq "Y") {
+			"y"
+		}
+		else {
+			"n"
+		}
+	}
+
+	if ($Unattended) {
+		$RunWake = if ($EnableWake) {
+			"y"
+		}
+		else {
+			"n"
+		}
+	}
+	else {
+		$RunWake = Read-Host "Run on system wake/unlock? ($(
+			if ($WakeDefault -eq 'Y') {
+				'Y/n'
+			}
+			else {
+				'y/N'
+			}
+		))"
 	}
 	if ([string]::IsNullOrWhiteSpace($RunWake)) {
-		$RunWake = "n"
+		$RunWake = if ($WakeDefault -eq "Y") {
+			"y"
+		}
+		else {
+			"n"
+		}
 	}
 
 	$TaskName = "Winget Updater"
@@ -171,6 +259,29 @@ $Values_Triggers
 	}
 	else {
 		Write-Host "No automation triggers selected." -ForegroundColor DarkGray
+	}
+
+	try {
+		$startupValue = if ($RunStartup -eq "y") {
+			1
+		}
+		else {
+			0
+		}
+		$wakeValue = if ($RunWake -eq "y") {
+			1
+		}
+		else {
+			0
+		}
+		
+		Set-ConfigValue -Name "AutoStartup" -Value $startupValue
+		Set-ConfigValue -Name "AutoWake" -Value $wakeValue
+		Set-ConfigValue -Name "InstalledVersion" -Value $AppVersion
+		Write-Host " -> Configuration saved." -ForegroundColor Green
+	}
+	catch {
+		Write-Host "Warning: Could not save configuration to registry: $($_.Exception.Message)" -ForegroundColor Yellow
 	}
 
 	Write-Host "`nSetup complete." -ForegroundColor Green
