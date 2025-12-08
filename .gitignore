@@ -1,3 +1,9 @@
+# User data
 /winget-updater-core/winget-updater-data.json
 /winget-updater-core/winget-updater-log.txt
+
+# WinGet manifests
 manifests
+
+# Installer output
+Output
