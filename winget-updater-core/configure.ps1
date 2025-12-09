@@ -5,6 +5,7 @@
 	Licensed under the MIT License.
 #>
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSAvoidUsingWriteHost", "")]
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSUseBOMForUnicodeEncodedFile", "")]
 param(
 	[switch]$Unattended,
 	[switch]$EnableStartup,
@@ -23,11 +24,14 @@ function Get-ConfigValue {
 			}
 		}
 	}
-	catch { }
+	catch {
+		$null = $_
+	}
 	return $Default
 }
 
 function Set-ConfigValue {
+	[CmdletBinding(SupportsShouldProcess)]
 	param([string]$Name, $Value)
 	if (-not (Test-Path $ConfigRegPath)) {
 		# Create parent keys if they don't exist
@@ -37,7 +41,9 @@ function Set-ConfigValue {
 		}
 		New-Item -Path $ConfigRegPath -Force | Out-Null
 	}
-	Set-ItemProperty -Path $ConfigRegPath -Name $Name -Value $Value -Force
+	if ($PSCmdlet.ShouldProcess($Name, "Set configuration value")) {
+		Set-ItemProperty -Path $ConfigRegPath -Name $Name -Value $Value -Force
+	}
 }
 
 try {
