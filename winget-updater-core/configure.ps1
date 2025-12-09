@@ -42,7 +42,19 @@ function Set-ConfigValue {
 
 try {
 	$AppName = "Winget Updater"
-	$AppVersion = "1.1.3"
+	$versionFilePath = if (Test-Path "$PSScriptRoot\version.isi") {
+		"$PSScriptRoot\version.isi"
+	}
+ else {
+		"$PSScriptRoot\..\installer\version.isi"
+	}
+	$versionLine = Get-Content $versionFilePath | Select-String '#define AppVersion'
+	$AppVersion = if ($versionLine) {
+		$versionLine.Line -replace '.*"(.*)".*', '$1'
+	}
+ else {
+		"Unknown"
+	}
 	$InstallDir = "$env:LOCALAPPDATA\WingetUpdater"
 	$SourceDir = $PSScriptRoot
 
@@ -86,6 +98,8 @@ try {
 	$Shortcut.TargetPath = "cmd.exe"
 	$Shortcut.Arguments = "/c start `"`" /min `"$InstallDir\launcher.bat`" -Forced"
 	$Shortcut.IconLocation = "shell32.dll,238"
+	$Shortcut.Description = "Update Windows applications using WinGet"
+	$Shortcut.WorkingDirectory = $InstallDir
 	$Shortcut.Save()
 
 	$UninstallKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\WingetUpdater"
@@ -96,7 +110,7 @@ try {
 	$ArpValues = @{
 		"DisplayName"     = $AppName
 		"DisplayVersion"  = $AppVersion
-		"Publisher"       = "Winget Updater"
+		"Publisher"       = "Eric Lowry"
 		"UninstallString" = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$InstallDir\uninstall.ps1`""
 		"DisplayIcon"     = "shell32.dll,238"
 		"InstallLocation" = $InstallDir
@@ -212,7 +226,8 @@ try {
 <?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
 <RegistrationInfo>
-	<Description>Runs Winget Updater interactively.</Description>
+	<Description>Runs Winget Updater to check for and install Windows application updates.</Description>
+	<Author>Eric Lowry</Author>
 	<URI>\$TaskName</URI>
 </RegistrationInfo>
 <Triggers>

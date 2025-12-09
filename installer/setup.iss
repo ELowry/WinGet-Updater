@@ -1,10 +1,22 @@
+#include "version.isi"
+
 [Setup]
 AppName=WinGet Updater
-AppVersion=1.1.3
-DefaultDirName={tmp}\WingetUpdaterInstaller
+AppVersion={#AppVersion}
+VersionInfoProductVersion={#AppVersion}
+VersionInfoVersion={#AppVersion}
+AppPublisher=Eric Lowry
+AppPublisherURL=https://github.com/ELowry/WinGet-Updater
+AppSupportURL=https://github.com/ELowry/WinGet-Updater/issues
+AppUpdatesURL=https://github.com/ELowry/WinGet-Updater/releases
+AppCopyright=Copyright 2025 Eric Lowry
+VersionInfoCompany=Eric Lowry
+VersionInfoDescription=WinGet Updater Installer
+VersionInfoProductName=WinGet Updater
+DefaultDirName={tmp}\WinGetUpdaterInstaller
 UsePreviousAppDir=no
 PrivilegesRequired=admin
-OutputBaseFilename=WingetUpdaterSetup
+OutputBaseFilename=WinGetUpdaterSetup
 Compression=lzma
 SolidCompression=yes
 Uninstallable=no
@@ -14,8 +26,10 @@ DisableProgramGroupPage=yes
 DisableWelcomePage=yes
 DisableReadyPage=yes
 DisableFinishedPage=yes
+WizardStyle=modern
 
 [Files]
+Source: "version.isi"; DestDir: "{tmp}"; Flags: ignoreversion
 Source: "..\winget-updater-core\winget-updater.ps1"; DestDir: "{tmp}"; Flags: ignoreversion
 Source: "..\winget-updater-core\configure.ps1"; DestDir: "{tmp}"; Flags: ignoreversion
 Source: "..\winget-updater-core\uninstall.ps1"; DestDir: "{tmp}"; Flags: ignoreversion
