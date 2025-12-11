@@ -3,7 +3,11 @@
 /winget-updater-core/winget-updater-log.txt
 
 # WinGet manifests
-manifests
+/manifests
 
 # Installer output
-Output
+/Output
+
+# Publishing utility
+/.winget-submission
+/publish.ps1

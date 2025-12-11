@@ -63,19 +63,16 @@ begin
   end;
 end;
 
-procedure CurPageChanged(CurPageID: Integer);
+procedure InitializeWizard;
 var
   I: Integer;
 begin
-  if CurPageID = wpSelectTasks then
+for I := 0 to WizardForm.TasksList.Items.Count - 1 do
   begin
-    for I := 0 to WizardForm.TasksList.Items.Count - 1 do
-    begin
-      if Pos('startup', WizardForm.TasksList.ItemCaption[I]) > 0 then
-        WizardForm.TasksList.Checked[I] := ShouldCheckStartup
-      else if Pos('wake', WizardForm.TasksList.ItemCaption[I]) > 0 then
-        WizardForm.TasksList.Checked[I] := ShouldCheckWake;
-    end;
+    if Pos('startup', LowerCase(WizardForm.TasksList.ItemCaption[I])) > 0 then
+      WizardForm.TasksList.Checked[I] := ShouldCheckStartup
+    else if Pos('wake', LowerCase(WizardForm.TasksList.ItemCaption[I])) > 0 then
+      WizardForm.TasksList.Checked[I] := ShouldCheckWake;
   end;
 end;
 

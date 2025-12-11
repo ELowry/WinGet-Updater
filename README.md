@@ -17,14 +17,50 @@ Winget Updater takes the headache out of keeping your software up-to-date. It si
 1. **Download the latest release** from the [Releases tab](../../releases/latest).
 2. Choose your preferred method:
 
-### Option 1: Installer (Recommended)
+### Option 1: WinGet (Recommended)
+
+The easiest way to install and keep the app up-to-date is via the Windows Package Manager.
+
+1. Open the Windows Terminal or a PowerShell window.
+2. Run the following command:
+   ```powershell
+   winget install EricLowry.WinGetUpdater
+   ```
+
+<details>
+<summary><em>Advanced: Configure Startup & Wake Options via WinGet</em></summary>
+<br/>
+
+By default, the WinGet installation runs silently with standard settings (WinGet Updater auto-runs at startup only); you can enforce your own configuration using the `--override` argument:
+
+- Run on **both** startup & wake:
+
+```powershell
+winget install EricLowry.WinGetUpdater --override "/VERYSILENT /TASKS=""startup,wake"""
+```
+
+- Run on wake **only**:
+
+```powershell
+winget install EricLowry.WinGetUpdater --override "/VERYSILENT /TASKS=""wake"""
+```
+
+- Never run automatically:
+
+```powershell
+winget install EricLowry.WinGetUpdater --override "/VERYSILENT /TASKS="""""
+```
+
+</details>
+
+### Option 2: Installer
 
 1. Download `WingetUpdaterSetup.exe`.
 2. Run the installer.
-3. Choose your automation settings (Run at Startup / Wake) during setup.
+3. Choose your automation settings (Run at Startup / Wake) during setup.
 4. That's it!
 
-### Option 2: Portable / Zip
+### Option 3: Portable / Zip
 
 1. Download the Source code (zip) or the release zip.
 2. Extract the files.
