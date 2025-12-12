@@ -91,8 +91,11 @@ try {
 	}
 
 	Copy-Item -Path "$SourceDir\winget-updater.ps1" -Destination $InstallDir -Force
+	Copy-Item -Path "$SourceDir\scheduled-updater.ps1" -Destination $InstallDir -Force
+	Copy-Item -Path "$SourceDir\utils.ps1" -Destination $InstallDir -Force
 	Copy-Item -Path "$SourceDir\uninstall.ps1" -Destination $InstallDir -Force
 	Copy-Item -Path "$SourceDir\launcher.bat" -Destination $InstallDir -Force
+	Copy-Item -Path "$SourceDir\silent.vbs" -Destination $InstallDir -Force
 
 	Write-Host "Setting up shortcuts..." -ForegroundColor Yellow
 	$StartMenuPrograms = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs"
@@ -102,7 +105,7 @@ try {
 
 	$Shortcut = $WshShell.CreateShortcut($LinkPath)
 	$Shortcut.TargetPath = "cmd.exe"
-	$Shortcut.Arguments = "/c start `"`" /min `"$InstallDir\launcher.bat`" -Forced"
+	$Shortcut.Arguments = "/c start `"`" /min `"$InstallDir\launcher.bat`""
 	$Shortcut.IconLocation = "shell32.dll,238"
 	$Shortcut.Description = "Update Windows applications using WinGet"
 	$Shortcut.WorkingDirectory = $InstallDir
@@ -224,8 +227,13 @@ try {
 "@
 	}
 
-	$SafeInstallDir = $InstallDir.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("`"", "&quot;")
-	$ArgString = "/c start /min &quot;&quot; &quot;$SafeInstallDir\launcher.bat&quot; -Minimal"
+	$VbsScript = "$InstallDir\silent.vbs"
+	$TargetScript = "$InstallDir\scheduled-updater.ps1"
+
+	$SafeVbs = $VbsScript.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("`"", "&quot;")
+	$SafeTarget = $TargetScript.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("`"", "&quot;")
+	
+	$ArgString = "`"$SafeVbs`" `"$SafeTarget`""
 	$User = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
 
 	$TaskXml = @"
@@ -267,7 +275,7 @@ $Values_Triggers
 </Settings>
 <Actions Context="Author">
 	<Exec>
-	<Command>cmd.exe</Command>
+	<Command>wscript.exe</Command>
 	<Arguments>$ArgString</Arguments>
 	</Exec>
 </Actions>
@@ -318,7 +326,7 @@ $Values_Triggers
 	}
 	if ($RunNow -eq "y") {
 		Write-Host "Launching Winget Updater..." -ForegroundColor Cyan
-		Start-Process -FilePath "cmd.exe" -ArgumentList "/c start `"`" /min `"$InstallDir\launcher.bat`" -Forced" -WindowStyle Hidden
+		Start-Process -FilePath "cmd.exe" -ArgumentList "/c start `"`" /min `"$InstallDir\launcher.bat`"" -WindowStyle Hidden
 	}
 }
 catch {

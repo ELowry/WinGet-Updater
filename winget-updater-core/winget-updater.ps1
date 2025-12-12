@@ -1,21 +1,21 @@
 <#
-	.SYNOPSIS
-		Winget Updater
-		Copyright 2025 Eric Lowry
-		Licensed under the MIT License.
-	#>
+.SYNOPSIS
+	WinGet Updater
+	Copyright 2025 Eric Lowry
+	Licensed under the MIT License.
+#>
+
 [CmdletBinding()]
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSAvoidUsingWriteHost", "")]
 param(
 	[switch]$NoClear,
-	[switch]$Forced,
 	[switch]$Silent,
 	[switch]$Minimal,
-	[switch]$NoDelay
+	[switch]$NoDelay,
+	[string]$CachePath
 )
 
-$DataFile = Join-Path $PSScriptRoot "winget-updater-data.json"
-$LogFile = Join-Path $PSScriptRoot "winget-updater-log.txt"
+. "$PSScriptRoot\utils.ps1"
 
 Function Show-Header {
 	if (-not $Silent) {
@@ -23,64 +23,6 @@ Function Show-Header {
 		Write-Host "       WINGET UPDATER       " -ForegroundColor White
 		Write-Host "============================" -ForegroundColor Cyan
 		Write-Host ""
-	}
-}
-
-Function Write-Status {
-	param(
-		[string]$Message,
-		[ConsoleColor]$ForegroundColor = "White",
-		[switch]$NoNewline,
-		[string]$Type = "Info", # 'Info' or 'Error'
-		[switch]$Important
-	)
-
-	$Show = $true
-
-	if ($Silent) {
-		$Show = $false
-	}
-	elseif ($Minimal -and $Type -eq "Info" -and -not $Important) {
-		$Show = $false
-	}
-
-	if ($Show) {
-		if ($NoNewline) {
-			Write-Host $Message -ForegroundColor $ForegroundColor -NoNewline
-		}
-		else {
-			Write-Host $Message -ForegroundColor $ForegroundColor
-		}
-	}
-}
-
-Function Write-Log {
-	param(
-		[string]$Message
-	)
-	$Timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-	"[$Timestamp] $Message" | Out-File -FilePath $LogFile -Append
-}
-
-Function Save-Data {
-	param(
-		[psobject]$DataToSave,
-		[string]$FilePath
-	)
-	$TempFile = [System.IO.Path]::GetTempFileName()
-	try {
-		$DataToSave | ConvertTo-Json -Depth 5 | Out-File -FilePath $TempFile -Encoding utf8
-		Move-Item -Path $TempFile -Destination $FilePath -Force
-		Write-Status "Data saved successfully." -Type Info
-	}
-	catch {
-		Write-Log "Failed to save data: $($_.Exception.Message)"
-		Write-Status "Error saving data file." -ForegroundColor Red -Type Error
-	}
-	finally {
-		if (Test-Path $TempFile) {
-			Remove-Item $TempFile -Force
-		}
 	}
 }
 
@@ -172,85 +114,6 @@ Function Show-EditMode {
 	}
 }
 
-Function Get-WingetUpdate {
-	Write-Status "Checking for available updates..." -Type Info
-	Write-Log "Checking for winget updates."
-	try {
-		Write-Log "Updating winget sources..."
-		Write-Status "Updating winget sources... (This may take a moment)" -Type Info
-		winget source update
-		if ($LASTEXITCODE -ne 0) {
-			throw "winget source update failed with exit code $LASTEXITCODE."
-		}
-		Write-Log "Winget sources updated."
-
-		Write-Log "Running 'winget upgrade' to find available updates."
-		Write-Status "Querying for available package updates..." -Type Info
-		[System.Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-		$wingetOutput = winget upgrade | Where-Object {
-			-not [string]::IsNullOrWhiteSpace($_)
-		}
-			
-		$updates = @()
-			
-		$headerLine = $wingetOutput | Where-Object {
-			$_ -like 'Name*Id*Version*'
-		} | Select-Object -First 1
-		$separatorLineIndex = -1
-		for ($i = 0; $i -lt $wingetOutput.Count; $i++) {
-			if ($wingetOutput[$i] -like '---*') {
-				$separatorLineIndex = $i
-				break
-			}
-		}
-
-		if (-not $headerLine -or $separatorLineIndex -eq -1) {
-			Write-Log "Could not find header or separator line in winget output. Assuming no updates."
-			return @()
-		}
-
-		$idIndex = $headerLine.IndexOf('Id')
-		$versionIndex = $headerLine.IndexOf('Version')
-		$availableIndex = $headerLine.IndexOf('Available')
-		$sourceIndex = $headerLine.IndexOf('Source')
-
-		for ($i = $separatorLineIndex + 1; $i -lt $wingetOutput.Count; $i++) {
-			$line = $wingetOutput[$i]
-			if ($line.Length -lt $sourceIndex -or $line -like '*upgrades available*' -or $line -like '*cannot be determined*') {
-				continue
-			}
-
-			try {
-				$name = $line.Substring(0, $idIndex).Trim()
-				$id = ($line.Substring($idIndex, $versionIndex - $idIndex).Trim() -replace '\p{C}')
-				$version = $line.Substring($versionIndex, $availableIndex - $versionIndex).Trim()
-				$available = $line.Substring($availableIndex, $sourceIndex - $availableIndex).Trim()
-
-				if (-not ([string]::IsNullOrWhiteSpace($id))) {
-					$updates += [PSCustomObject]@{
-						Name             = $name
-						Id               = $id
-						Version          = $version
-						AvailableVersion = $available
-					}
-				}
-			}
-			catch {
-				Write-Log "Failed to parse line: '$line'. Error: $($_.Exception.Message)"
-			}
-		}
-
-		Write-Log "Found $($updates.Count) valid updates."
-		return $updates
-	}
-	catch {
-		$errorMessage = $_.Exception.Message
-		Write-Log "Error getting winget updates: $errorMessage"
-		Write-Status "An error occurred while fetching updates. Check the log file for details." -ForegroundColor Red -Type Error
-		return @()
-	}
-}
-
 Function Show-UpdateMenu {
 	param (
 		[System.Collections.ArrayList]$Updates,
@@ -320,6 +183,51 @@ Function Show-UpdateMenu {
 	return $choices
 }
 
+Function Invoke-Countdown {
+	param(
+		[int]$Seconds,
+		[string]$Message,
+		[System.Collections.ArrayList]$Whitelist,
+		[System.Collections.ArrayList]$Blocklist,
+		[System.Collections.ArrayList]$Forcelist
+	)
+
+	Write-Host "$Message" -ForegroundColor Yellow
+	
+	$timeout = [DateTime]::Now.AddSeconds($Seconds)
+	while ([DateTime]::Now -lt $timeout) {
+		if ($Host.UI.RawUI.KeyAvailable) {
+			$k = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+				
+			if ($k.Character.ToString().ToLower() -eq 'e') {
+				Show-EditMode -Whitelist $Whitelist -Blocklist $Blocklist -Forcelist $Forcelist
+				
+				# Save immediately after editing
+				$dataToSave = @{
+					Whitelist = @($Whitelist)
+					Blocklist = @($Blocklist)
+					Forcelist = @($Forcelist)
+					LastRun   = (Get-Date).ToString("o")
+				}
+				Save-Data -DataToSave $dataToSave -FilePath $DataFile
+				Write-Host "`nConfiguration saved." -ForegroundColor Green
+				Start-Sleep -Seconds 1
+				return $true # Indicates an edit happened
+			}
+			if ($k.VirtualKeyCode -eq 13) {
+				return $false # Enter key pressed, skip delay
+			}
+		}
+		Start-Sleep -Milliseconds 50
+	}
+	return $false
+}
+
+if (-not $NoClear -and -not $Silent -and -not $Minimal) {
+	Clear-Host
+}
+
+Show-Header
 
 if (Test-Path $LogFile) {
 	Clear-Content -Path $LogFile -ErrorAction SilentlyContinue
@@ -342,133 +250,45 @@ if (Test-Path $DataFile) {
 
 $whitelist = [System.Collections.ArrayList]::new()
 if ($null -ne $data -and $data.Whitelist) {
-	if ($data.Whitelist -is [string]) {
-		$whitelist.Add($data.Whitelist)
-	}
-	else {
-		$whitelist.AddRange($data.Whitelist)
-	}
+	$whitelist.AddRange(@($data.Whitelist))
 }
 
 $blocklist = [System.Collections.ArrayList]::new()
 if ($null -ne $data -and $data.Blocklist) {
-	if ($data.Blocklist -is [string]) {
-		$blocklist.Add($data.Blocklist)
-	}
-	else {
-		$blocklist.AddRange($data.Blocklist)
-	}
+	$blocklist.AddRange(@($data.Blocklist))
 }
 
 $forcelist = [System.Collections.ArrayList]::new()
 if ($null -ne $data -and $data.Forcelist) {
-	if ($data.Forcelist -is [string]) {
-		$forcelist.Add($data.Forcelist)
-	}
-	else {
-		$forcelist.AddRange($data.Forcelist)
-	}
+	$forcelist.AddRange(@($data.Forcelist))
 }
 
 $hasValidData = ($whitelist.Count + $blocklist.Count + $forcelist.Count) -gt 0
 
 if (-not $Silent -and -not $Minimal -and $hasValidData) {
-	Write-Host "Starting in 2 seconds... (Press any key to edit list)" -NoNewline -ForegroundColor Yellow
-	$timeout = [DateTime]::Now.AddSeconds(2)
-	$interrupted = $false
-	while ([DateTime]::Now -lt $timeout) {
-		if ($Host.UI.RawUI.KeyAvailable) {
-			$interrupted = $true
-			$null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-			break
-		}
-		Start-Sleep -Milliseconds 50
-	}
-	Write-Host ""
-
-	if ($interrupted) {
-		Clear-Host
-		Write-Host "--- PAUSED ---" -ForegroundColor Cyan
-		Write-Host "[Enter] Continue to Update" -ForegroundColor Yellow
-		if ($hasValidData) {
-			Write-Host "[E]     Edit Existing List" -ForegroundColor Yellow
-		}
-		Write-Host "[Q]     Quit" -ForegroundColor Yellow
-			
-		while ($true) {
-			$k = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-			$ch = $k.Character.ToString().ToLower()
-				
-			if ($k.VirtualKeyCode -eq 13) {
-				# Enter
-				break
-			}
-			if ($ch -eq 'q') {
-				exit
-			}
-			if ($hasValidData -and $ch -eq 'e') {
-				Show-EditMode -Whitelist $whitelist -Blocklist $blocklist -Forcelist $forcelist
-				$savedLastRun = if ($data -and $data.LastRun) {
-					$data.LastRun
-				}
-				else {
-					[DateTime]::MinValue.ToString("o")
-				}
-				$dataToSave = @{
-					Whitelist = @($whitelist)
-					Blocklist = @($blocklist)
-					Forcelist = @($forcelist)
-					LastRun   = $savedLastRun
-				}
-				Save-Data -DataToSave $dataToSave -FilePath $DataFile
-				Write-Host "`nConfiguration saved. Continuing to update..." -ForegroundColor Green
-				break
-			}
-		}
-	}
+	Invoke-Countdown -Seconds 2 `
+		-Message "Press 'E' to edit list, or Enter to run updater (auto-starts in 2s)..." `
+		-Whitelist $whitelist -Blocklist $blocklist -Forcelist $forcelist | Out-Null
 }
 
-$lastRunDate = [DateTime]::MinValue
-if ($null -ne $data -and $data.PSObject.Properties.Name -contains 'LastRun') {
-	try {
-		if ($data.LastRun -is [string]) {
-			$lastRunDate = [DateTime]::Parse($data.LastRun, $null, [System.Globalization.DateTimeStyles]::RoundtripKind)
-		}
-		elseif ($data.LastRun.DateTime) {
-			$lastRunDate = [datetime]$data.LastRun.DateTime
-		}
+try {
+	if ($CachePath -and (Test-Path $CachePath)) {
+		Write-Status "Loading cached update data..." -Type Info
+		$allUpdates = Get-Content $CachePath | ConvertFrom-Json
 	}
-	catch {
-		Write-Log "Could not parse LastRun date: '$($data.LastRun)'. Resetting."
+	else {
+		$allUpdates = Get-WinGetUpdate
 	}
 }
-
-if (-not $Forced -and ($lastRunDate.Date -eq (Get-Date).Date)) {
-	Write-Log "Script has already run today. Exiting."
-	if ($Minimal) {
-		Write-Host "Already run today." -ForegroundColor DarkGray
-		if (-not $NoDelay) {
-			Start-Sleep -Seconds 1
-		}
-	}
-	elseif (-not $Silent) {
-		Write-Host "This script has already been run successfully today." -ForegroundColor Red
-		Write-Host "Use -Forced to bypass this check." -ForegroundColor DarkGray
-		if (-not $NoDelay) {
-			Start-Sleep -Seconds 3
-		}
-	}
-	exit
+catch {
+	Write-Status "Error loading update data." -Type Error
+	$allUpdates = @()
 }
-
-
-if (-not $NoClear -and -not $Silent -and -not $Minimal) {
-	Clear-Host
+finally {
+	if ($CachePath -and (Test-Path $CachePath)) {
+		Remove-Item $CachePath -Force -ErrorAction SilentlyContinue
+	}
 }
-
-Show-Header
-
-$allUpdates = Get-WingetUpdate
 
 $updatesToForce = @(
 	$allUpdates | Where-Object {
@@ -498,7 +318,7 @@ if ($updatesToForce.Count -gt 0) {
 				winget upgrade --id $update.Id --accept-source-agreements --accept-package-agreements
 			}
 			if ($LASTEXITCODE -ne 0) {
-				throw "Winget failed to update $($update.Name) (ID: $($update.Id))"
+				throw "WinGet failed to update $($update.Name) (ID: $($update.Id))"
 			}
 		}
 		catch {
@@ -522,7 +342,6 @@ if ($updatesToProcess.Count -eq 0) {
 	Write-Status "`nNo new updates to review." -Type Info
 }
 else {
-	# Get user choices (Interaction required, so this bypasses Silent/Minimal logic)
 	$userChoices = Show-UpdateMenu -Updates $updatesToProcess -Whitelist $whitelist
 
 	if ($userChoices.Count -gt 0) {
@@ -560,7 +379,7 @@ else {
 							winget upgrade --id $id --accept-source-agreements --accept-package-agreements
 						}
 						if ($LASTEXITCODE -ne 0) {
-							throw "Winget failed to update $updateName (ID: $id)"
+							throw "WinGet failed to update $updateName (ID: $id)"
 						}
 					}
 					catch {
@@ -589,7 +408,7 @@ else {
 							winget upgrade --id $id --accept-source-agreements --accept-package-agreements
 						}
 						if ($LASTEXITCODE -ne 0) {
-							throw "Winget failed to update $updateName (ID: $id)"
+							throw "WinGet failed to update $updateName (ID: $id)"
 						}
 					}
 					catch {
@@ -635,33 +454,9 @@ Write-Status "`nUpdate complete." -Type Info -ForegroundColor Green -Important
 $hasValidData = ($whitelist.Count + $blocklist.Count + $forcelist.Count) -gt 0
 
 if (-not $Silent -and -not $Minimal -and $hasValidData) {
-	Write-Host "Press 'E' to edit list, or Enter to exit..." -ForegroundColor Yellow
-		
-	# Wait up to 5 seconds for input
-	$timeout = [DateTime]::Now.AddSeconds(5)
-	while ([DateTime]::Now -lt $timeout) {
-		if ($Host.UI.RawUI.KeyAvailable) {
-			$k = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-				
-			if ($k.Character.ToString().ToLower() -eq 'e') {
-				Show-EditMode -Whitelist $whitelist -Blocklist $blocklist -Forcelist $forcelist
-				$dataToSave = @{
-					Whitelist = @($whitelist)
-					Blocklist = @($blocklist)
-					Forcelist = @($forcelist)
-					LastRun   = (Get-Date).ToString("o")
-				}
-				Save-Data -DataToSave $dataToSave -FilePath $DataFile
-				Write-Host "`nConfiguration saved." -ForegroundColor Green
-				Start-Sleep -Seconds 1
-				break
-			}
-			if ($k.VirtualKeyCode -eq 13) {
-				break
-			}
-		}
-		Start-Sleep -Milliseconds 50
-	}
+	Invoke-Countdown -Seconds 5 `
+		-Message "Press 'E' to edit list, or Enter to exit (auto-exits in 5s)..." `
+		-Whitelist $whitelist -Blocklist $blocklist -Forcelist $forcelist | Out-Null
 }
 elseif (-not $Silent -and -not $NoDelay -and -not $Minimal) {
 	Start-Sleep -Seconds 3

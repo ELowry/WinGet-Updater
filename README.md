@@ -92,8 +92,6 @@ For power users who prefer the terminal, after installation you can run:
 - `-Minimal`: Shows only the most important status messages.
   - _Enabled by default during scheduled runs._
 - `-Silent`: Runs without any popups unless the script encounters unknown apps.
-- `-Forced`: Checks for updates even if it has already run today.
-  - _Enabled by default when using the Start Menu shortcut._
 - `-NoClear`: Prevents clearing the console when the script starts.
 
 ## License
