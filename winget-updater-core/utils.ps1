@@ -4,6 +4,9 @@
 	Copyright 2025 Eric Lowry
 	Licensed under the MIT License.
 #>
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSAvoidUsingWriteHost", "")]
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSUseDeclaredVarsMoreThanAssignments", "")]
+param()
 
 $DataFile = Join-Path $PSScriptRoot "winget-updater-data.json"
 $LogFile = Join-Path $PSScriptRoot "winget-updater-log.txt"
@@ -29,7 +32,7 @@ Function Get-LastRunDate {
 		return [DateTime]::MinValue
 	}
 	catch {
-		Write-Log "Could not parse LastRun date: '$($Data.LastRun)'. Resetting."
+		Write-Log "Could not parse LastRun date: '$($Data.LastRun)'. Error: $($_.Exception.Message)"
 		return [DateTime]::MinValue
 	}
 }
@@ -71,7 +74,7 @@ Function Write-Log {
 		"[$Timestamp] $Message" | Out-File -FilePath $LogFile -Append -ErrorAction SilentlyContinue
 	}
  catch {
-		# If logging fails (e.g. file locked), we swallow the error to avoid crashing the update
+		Write-Status "Error logging message: $Message" -ForegroundColor Red -Type Error
 	}
 }
 

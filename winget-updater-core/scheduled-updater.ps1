@@ -4,6 +4,7 @@
 	Copyright 2025 Eric Lowry
 	Licensed under the MIT License.
 #>
+param()
 
 . "$PSScriptRoot\utils.ps1"
 
@@ -15,7 +16,9 @@ if (Test-Path $DataFile) {
 			$data = $fileContent | ConvertFrom-Json
 		}
 	}
-	catch {}
+	catch {
+		Write-Log "Warning: Failed to load data file. Starting fresh. Error: $($_.Exception.Message)"
+	}
 }
 
 $lastRunDate = Get-LastRunDate -Data $data
