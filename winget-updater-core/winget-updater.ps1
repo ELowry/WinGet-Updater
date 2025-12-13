@@ -194,28 +194,32 @@ Function Invoke-Countdown {
 
 	Write-Host "$Message" -ForegroundColor Yellow
 	
-	$timeout = [DateTime]::Now.AddSeconds($Seconds)
+	$startTime = [DateTime]::Now
+	$timeout = $startTime.AddSeconds($Seconds)
+
 	while ([DateTime]::Now -lt $timeout) {
 		if ($Host.UI.RawUI.KeyAvailable) {
-			$k = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+			$k = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown,IncludeKeyUp")
+			
+			if ($k.KeyDown) {
+				if ($k.Character -and $k.Character.ToString().ToLower() -eq 'e') {
+					Show-EditMode -Whitelist $Whitelist -Blocklist $Blocklist -Forcelist $Forcelist
 				
-			if ($k.Character.ToString().ToLower() -eq 'e') {
-				Show-EditMode -Whitelist $Whitelist -Blocklist $Blocklist -Forcelist $Forcelist
-				
-				# Save immediately after editing
-				$dataToSave = @{
-					Whitelist = @($Whitelist)
-					Blocklist = @($Blocklist)
-					Forcelist = @($Forcelist)
-					LastRun   = (Get-Date).ToString("o")
+					# Save immediately after editing
+					$dataToSave = @{
+						Whitelist = @($Whitelist)
+						Blocklist = @($Blocklist)
+						Forcelist = @($Forcelist)
+						LastRun   = (Get-Date).ToString("o")
+					}
+					Save-Data -DataToSave $dataToSave -FilePath $DataFile
+					Write-Host "`nConfiguration saved." -ForegroundColor Green
+					Start-Sleep -Seconds 1
+					return $true # Indicates an edit happened
 				}
-				Save-Data -DataToSave $dataToSave -FilePath $DataFile
-				Write-Host "`nConfiguration saved." -ForegroundColor Green
-				Start-Sleep -Seconds 1
-				return $true # Indicates an edit happened
-			}
-			if ($k.VirtualKeyCode -eq 13) {
-				return $false # Enter key pressed, skip delay
+				if ($k.VirtualKeyCode -eq 13 -and ([DateTime]::Now - $startTime).TotalMilliseconds -lt 100) {
+					return $false # Enter key pressed, skip delay
+				}
 			}
 		}
 		Start-Sleep -Milliseconds 50
