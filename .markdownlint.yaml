@@ -12,3 +12,11 @@ MD041: false # First line in a file should be a top-level heading
 # Prettier usually indents lists with 2 spaces or tabs, which can trigger this.
 # Disabling this to defer to Prettier's formatting style.
 MD030: false # Spaces after list markers
+
+# Allow specific HTML tags for collapsible sections
+MD033:
+  allowed_elements:
+    - details
+    - summary
+    - em
+    - br
