@@ -329,29 +329,35 @@ timeout /t 3 /nobreak > NUL
 echo Updating Winget Updater...
 winget upgrade $SelfID --accept-source-agreements --accept-package-agreements
 
-if %errorlevel% equ 0 (
-	echo Update successful. Restarting...
-	
-	where wt >nul 2>&1
-	if %errorlevel% equ 0 (
-		start "" wt -w new powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$installDir\winget-updater.ps1"
-	) else (
-		start "" powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$installDir\winget-updater.ps1"
-	)
-	
-	(goto) 2>nul & del "%~f0"
-) else (
-	echo.
-	echo [!] Update failed.
-	echo This usually happens if the application folder is open in another console window.
-	echo.
-	echo Please close any open Explorer, Terminal, or PowerShell windows operating on:
-	echo "$installDir"
-	echo.
-	echo Press any key to try again...
-	pause >nul
-	goto RETRY_UPDATE
-)
+if errorlevel 1 goto UPDATE_FAILED
+
+echo Update successful. Restarting...
+
+where wt >nul 2>&1
+if errorlevel 1 goto NO_WT
+
+:HAS_WT
+start "" wt -w new powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$installDir\winget-updater.ps1"
+goto FINISH
+
+:NO_WT
+start "" powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$installDir\winget-updater.ps1"
+goto FINISH
+
+:UPDATE_FAILED
+echo.
+echo [!] Update failed.
+echo This usually happens if the application folder is open in another console window.
+echo.
+echo Please close any open Explorer, Terminal, or PowerShell windows operating on:
+echo "$installDir"
+echo.
+echo Press any key to try again...
+pause >nul
+goto RETRY_UPDATE
+
+:FINISH
+(goto) 2>nul & del "%~f0"
 "@
 		Set-Content -Path $batchPath -Value $batchContent -Encoding Ascii
 		Start-Process "cmd.exe" -ArgumentList "/c `"$batchPath`"" -WindowStyle Normal -WorkingDirectory $env:TEMP
