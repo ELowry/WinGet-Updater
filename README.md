@@ -26,9 +26,11 @@ Winget Updater takes the headache out of keeping your software up-to-date. It si
 1. **Download the latest version of `WinGet-Updater.zip`** from the [Releases tab](../../releases/latest).
 2. Extract the files.
 3. Double-click `install-winget-updater.bat`.
-   - _Note: This will ask for administrator permissions to set up the automation._
-4. Follow the simple on-screen prompts to choose your automation settings (Run at Startup / Wake).
-5. _You can now delete the downloaded files._
+   > [!NOTE]
+   > This will ask for administrator permissions to set up the automation.
+4. Follow the simple on-screen prompts to choose your automation settings (Run at Startup / Wake).
+   > [!IMPORTANT]
+   > You can now delete the downloaded files.
 
 ## Usage
 
@@ -38,7 +40,8 @@ If you ever want to check for updates manually or change your settings:
 
 1. Open your Start Menu.
 2. Search for **Winget Updater** and run it.
-3. _If you press E during the short delay at the start of the script or after it has finished, you will be given the option to edit the settings for previously encountered applications._
+   > [!TIP]
+   > If you press E during the short delay at the start of the script or after it has finished, you will be given the option to edit the settings for previously encountered applications.
 
 ### Advanced Usage (command line)
 
@@ -54,6 +57,16 @@ For power users who prefer the terminal, after installation you can run:
   - _Enabled by default during scheduled runs._
 - `-Silent`: Runs without any popups unless the script encounters unknown apps.
 - `-NoClear`: Prevents clearing the console when the script starts.
+
+### Customizing Update Options
+
+You can configure specific [update options](https://learn.microsoft.com/en-us/windows/package-manager/winget/upgrade#options) for individual applications (e.g., `--interactive`, `--location`, `--force`, etc.). This is useful for apps that require special handling or user input during updates.
+
+- When prompted to choose an action for an update, select **[O]ptions**.
+- In the "Edit Mode" (press `E` during startup/exit), select an app and choose **[O]ptions**.
+
+> [!NOTE]
+> The `--accept-source-agreements` and `--accept-package-agreements` flags are included by default.
 
 ## License
 

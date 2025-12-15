@@ -30,13 +30,14 @@ Function Show-EditMode {
 	param (
 		[System.Collections.ArrayList]$Whitelist,
 		[System.Collections.ArrayList]$Blocklist,
-		[System.Collections.ArrayList]$Forcelist
+		[System.Collections.ArrayList]$Forcelist,
+		$PackageOptions
 	)
 
 	Clear-Host
 	Write-Host "--- EDIT MODE ---" -ForegroundColor Cyan
 	Write-Host "Reviewing managed packages."
-		
+
 	$allIds = @($Whitelist + $Blocklist + $Forcelist) | Select-Object -Unique | Sort-Object
 
 	if ($allIds.Count -eq 0) {
@@ -51,7 +52,7 @@ Function Show-EditMode {
 			$id = $allIds[$i]
 			$status = "Unknown"
 			$color = "Gray"
-				
+
 			if ($Forcelist.Contains($id)) {
 				$status = "ALWAYS RUN"; $color = "Magenta"
 			}
@@ -59,30 +60,33 @@ Function Show-EditMode {
 				$status = "BLOCKED"; $color = "Red"
 			}
 			elseif ($Whitelist.Contains($id)) {
-				$status = "Run (Default)"; $color = "Cyan"
+				$status = "Run (Default)"; $color = "Green"
 			}
 
-			Write-Host "[$($i+1)] $id " -NoNewline
+			Write-Host "[$($i+1)] $id " -NoNewline -ForegroundColor White
 			Write-Host "[$status]" -ForegroundColor $color
 		}
 
 		Write-Host "`nEnter number to edit, or 'q' to save and exit."
-		$choice = Read-Host "Selection"
-			
+		Write-Host "Selection: " -NoNewline -ForegroundColor Yellow
+		$choice = Read-Host
+
 		if ($choice -eq 'q') {
 			$exitEdit = $true
 		}
 		elseif ($choice -match '^\d+$' -and [int]$choice -le $allIds.Count -and [int]$choice -gt 0) {
 			$selectedIndex = [int]$choice - 1
 			$selectedId = $allIds[$selectedIndex]
-				
+
 			Write-Host "`nEditing: $selectedId" -ForegroundColor Yellow
 			Write-Host "[F]orce (Always Run)"
 			Write-Host "[B]lock (Never Run)"
 			Write-Host "[W]hitelist (Default to Run)"
 			Write-Host "[R]emove (Forget setting)"
-				
-			$action = Read-Host "Set status"
+			Write-Host "[O]ptions (Set custom arguments)"
+
+			Write-Host "Set status: " -NoNewline -ForegroundColor Yellow
+			$action = Read-Host
 			$action = $action.ToLower()
 
 			if ($Whitelist.Contains($selectedId)) {
@@ -97,17 +101,43 @@ Function Show-EditMode {
 
 			switch ($action) {
 				"f" {
-					$Forcelist.Add($selectedId) | Out-Null; Write-Host "Set to Always Run."
+					$Forcelist.Add($selectedId) | Out-Null; Write-Host "Set to Always Run." -ForegroundColor Green
 				}
 				"b" {
-					$Blocklist.Add($selectedId) | Out-Null; Write-Host "Set to Blocked."
+					$Blocklist.Add($selectedId) | Out-Null; Write-Host "Set to Blocked." -ForegroundColor Green
 				}
 				"w" {
-					$Whitelist.Add($selectedId) | Out-Null; Write-Host "Set to Whitelist."
+					$Whitelist.Add($selectedId) | Out-Null; Write-Host "Set to Whitelist." -ForegroundColor Green
 				}
 				"r" {
-					Write-Host "Removed from tracking."
+					Write-Host "Removed from tracking." -ForegroundColor Green
 					$allIds = @($Whitelist + $Blocklist + $Forcelist) | Select-Object -Unique | Sort-Object
+				}
+				"o" {
+					$current = if ($null -ne $PackageOptions -and $PackageOptions.Contains($selectedId)) {
+						$PackageOptions[$selectedId]
+					}
+					else {
+						""
+					}
+					if ($current -is [array]) {
+						$current = $current -join " "
+					}
+					Write-Host "Current options: '$current'" -ForegroundColor DarkGray
+					Write-Host "Note: --accept-source-agreements and --accept-package-agreements are always enabled." -ForegroundColor DarkGray
+					Write-Host "New arguments (leave empty to clear): " -NoNewline -ForegroundColor Yellow
+					$newOpts = Read-Host
+					if ($null -eq $PackageOptions) {
+						$PackageOptions = @{}
+					}
+					if ([string]::IsNullOrWhiteSpace($newOpts)) {
+						$PackageOptions.Remove($selectedId)
+						Write-Host "Options cleared." -ForegroundColor Green
+					}
+					else {
+						$PackageOptions[$selectedId] = $newOpts
+						Write-Host "Options updated." -ForegroundColor Green
+					}
 				}
 			}
 		}
@@ -117,7 +147,8 @@ Function Show-EditMode {
 Function Show-UpdateMenu {
 	param (
 		[System.Collections.ArrayList]$Updates,
-		[System.Collections.ArrayList]$Whitelist
+		[System.Collections.ArrayList]$Whitelist,
+		$PackageOptions
 	)
 
 	$choices = @{}
@@ -125,7 +156,7 @@ Function Show-UpdateMenu {
 
 	for ($i = 0; $i -lt $Updates.Count; $i++) {
 		$update = $Updates[$i]
-			
+
 		if ($null -eq $update -or [string]::IsNullOrWhiteSpace($update.Id)) {
 			continue
 		}
@@ -148,18 +179,53 @@ Function Show-UpdateMenu {
 		Write-Host "[$($i+1)/$($Updates.Count)] " -NoNewline
 		Write-Host $update.Name -ForegroundColor White
 		Write-Host "  $($update.Version) -> $($update.AvailableVersion)" -ForegroundColor DarkGray
-			
-		$prompt = "  Choose action: [R]un, [A]lways run, [S]kip, [B]lock (Default is '$defaultWord')"
-			
-		do {
-			$response = Read-Host -Prompt $prompt
-			if ([string]::IsNullOrWhiteSpace($response)) {
-				$response = $defaultChar
-			}
-			$response = $response.ToLower()
-		} while ($response -notin @('r', 'a', 's', 'b'))
 
-		switch ($response) {
+		$prompt = "  Choose action: [R]un, [A]lways run, [S]kip, [B]lock, [O]ptions (Default is '$defaultWord')"
+
+		$actionChoice = $null
+		while ($null -eq $actionChoice) {
+			do {
+				Write-Host "${prompt}: " -NoNewline -ForegroundColor Yellow
+				$response = Read-Host
+				if ([string]::IsNullOrWhiteSpace($response)) {
+					$response = $defaultChar
+				}
+				$response = $response.ToLower()
+			} while ($response -notin @('r', 'a', 's', 'b', 'o'))
+
+			if ($response -eq 'o') {
+				$current = if ($null -ne $PackageOptions -and $PackageOptions.Contains($update.Id)) {
+					$PackageOptions[$update.Id]
+				}
+				else {
+					""
+				}
+				if ($current -is [array]) {
+					$current = $current -join " "
+				}
+				Write-Host "  Current options: '$current'" -ForegroundColor DarkGray
+				Write-Host "  Note: --accept-source-agreements and --accept-package-agreements are always enabled." -ForegroundColor DarkGray
+				Write-Host "  New arguments (leave empty to clear): " -NoNewline -ForegroundColor Yellow
+				$newOpts = Read-Host
+				if ($null -eq $PackageOptions) {
+					$PackageOptions = @{}
+				}
+				if ([string]::IsNullOrWhiteSpace($newOpts)) {
+					$PackageOptions.Remove($update.Id)
+					Write-Host "  Options cleared." -ForegroundColor Green
+				}
+				else {
+					$PackageOptions[$update.Id] = $newOpts
+					Write-Host "  Options updated." -ForegroundColor Green
+				}
+				# Loop again
+			}
+			else {
+				$actionChoice = $response
+			}
+		}
+
+		switch ($actionChoice) {
 			"r" {
 				$choices[$update.Id] = "Run"
 				Write-Host "  -> Marked to RUN." -ForegroundColor Green
@@ -189,28 +255,32 @@ Function Invoke-Countdown {
 		[string]$Message,
 		[System.Collections.ArrayList]$Whitelist,
 		[System.Collections.ArrayList]$Blocklist,
-		[System.Collections.ArrayList]$Forcelist
+		[System.Collections.ArrayList]$Forcelist,
+		$PackageOptions
 	)
 
 	Write-Host "$Message" -ForegroundColor Yellow
-	
+
 	$startTime = [DateTime]::Now
 	$timeout = $startTime.AddSeconds($Seconds)
 
 	while ([DateTime]::Now -lt $timeout) {
 		if ($Host.UI.RawUI.KeyAvailable) {
 			$k = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown,IncludeKeyUp")
-			
+
 			if ($k.KeyDown) {
 				if ($k.Character -and $k.Character.ToString().ToLower() -eq 'e') {
-					Show-EditMode -Whitelist $Whitelist -Blocklist $Blocklist -Forcelist $Forcelist
-				
+					Show-EditMode -Whitelist $Whitelist -Blocklist $Blocklist -Forcelist $Forcelist -PackageOptions $PackageOptions
+
 					# Save immediately after editing
 					$dataToSave = @{
 						Whitelist = @($Whitelist)
 						Blocklist = @($Blocklist)
 						Forcelist = @($Forcelist)
 						LastRun   = (Get-Date).ToString("o")
+					}
+					if ($PackageOptions) {
+						$dataToSave["PackageOptions"] = $PackageOptions
 					}
 					Save-Data -DataToSave $dataToSave -FilePath $DataFile
 					Write-Host "`nConfiguration saved." -ForegroundColor Green
@@ -267,17 +337,29 @@ if ($null -ne $data -and $data.Forcelist) {
 	$forcelist.AddRange(@($data.Forcelist))
 }
 
+$packageOptions = @{}
+if ($null -ne $data -and $null -ne $data.PackageOptions) {
+	if ($data.PackageOptions -is [System.Management.Automation.PSCustomObject]) {
+		$data.PackageOptions.PSObject.Properties | ForEach-Object {
+			$packageOptions[$_.Name] = $_.Value
+		}
+	}
+	elseif ($data.PackageOptions -is [System.Collections.IDictionary]) {
+		$packageOptions = $data.PackageOptions
+	}
+}
+
 $hasValidData = ($whitelist.Count + $blocklist.Count + $forcelist.Count) -gt 0
 
 if (-not $Silent -and -not $Minimal -and $hasValidData) {
 	Invoke-Countdown -Seconds 2 `
 		-Message "Press 'E' to edit list, or Enter to run updater (auto-starts in 2s)..." `
-		-Whitelist $whitelist -Blocklist $blocklist -Forcelist $forcelist | Out-Null
+		-Whitelist $whitelist -Blocklist $blocklist -Forcelist $forcelist -PackageOptions $packageOptions | Out-Null
 }
 
 try {
 	if ($CachePath -and (Test-Path $CachePath)) {
-		Write-Status "Loading cached update data..." -Type Info
+		Write-Status "Loading cached update data..." -Type Info -ForegroundColor Yellow
 		$allUpdates = Get-Content $CachePath | ConvertFrom-Json
 	}
 	else {
@@ -299,10 +381,10 @@ $SelfID = "EricLowry.WinGetUpdater"
 $selfUpdate = $allUpdates | Where-Object { $_.Id -eq $SelfID } | Select-Object -First 1
 
 if ($selfUpdate) {
-	Write-Status "`n[!] Update available for Winget Updater (v$($selfUpdate.AvailableVersion))" -ForegroundColor Cyan -Important
-	
+	Write-Status "`n[!] Update available for Winget Updater (v$($selfUpdate.AvailableVersion))" -ForegroundColor Yellow -Important
+
 	$doSelfUpdate = $false
-	
+
 	if (-not $Silent) {
 		Write-Host "    Update and restart application now? [Y/n] " -NoNewline -ForegroundColor Yellow
 		$response = Read-Host
@@ -312,11 +394,11 @@ if ($selfUpdate) {
 	}
 
 	if ($doSelfUpdate) {
-		Write-Status "Spawning updater..." -Type Info
-		
+		Write-Status "Spawning updater..." -Type Info -ForegroundColor Yellow
+
 		$batchPath = [System.IO.Path]::GetTempFileName() + ".bat"
 		$installDir = $PSScriptRoot
-		
+
 		$batchContent = @"
 @echo off
 cd /d "%TEMP%"
@@ -363,8 +445,10 @@ goto RETRY_UPDATE
 		Start-Process "cmd.exe" -ArgumentList "/c `"$batchPath`"" -WindowStyle Normal -WorkingDirectory $env:TEMP
 		exit
 	}
-	
-	$allUpdates = @($allUpdates | Where-Object { $_.Id -ne $SelfID })
+
+	$allUpdates = @($allUpdates | Where-Object {
+			$_.Id -ne $SelfID
+		})
 }
 
 $updatesToForce = @(
@@ -388,12 +472,23 @@ if ($updatesToForce.Count -gt 0) {
 	foreach ($update in $updatesToForce) {
 		Write-Status "Updating $($update.Name)..." -ForegroundColor Yellow -Type Info -Important
 		try {
+			$extraArgs = ""
+			if ($null -ne $packageOptions) {
+				$val = $packageOptions.$($update.Id)
+				if ($null -ne $val) {
+					if ($val -is [array]) {
+						$extraArgs = $val -join " "
+					}
+					else {
+						$extraArgs = $val
+					}
+				}
+			}
+			$cmd = "winget upgrade --id `"$($update.Id)`" $extraArgs --accept-source-agreements --accept-package-agreements"
 			if ($Minimal) {
-				winget upgrade --id $update.Id --accept-source-agreements --accept-package-agreements | Out-Null
+				$cmd += " | Out-Null"
 			}
-			else {
-				winget upgrade --id $update.Id --accept-source-agreements --accept-package-agreements
-			}
+			Invoke-Expression $cmd
 			if ($LASTEXITCODE -ne 0) {
 				throw "WinGet failed to update $($update.Name) (ID: $($update.Id))"
 			}
@@ -416,10 +511,10 @@ if ($blockedUpdates.Count -gt 0) {
 
 if ($updatesToProcess.Count -eq 0) {
 	Write-Log "No updates to process after filtering."
-	Write-Status "`nNo new updates to review." -Type Info
+	Write-Status "`nNo new updates to review." -Type Info -ForegroundColor Green
 }
 else {
-	$userChoices = Show-UpdateMenu -Updates $updatesToProcess -Whitelist $whitelist
+	$userChoices = Show-UpdateMenu -Updates $updatesToProcess -Whitelist $whitelist -PackageOptions $packageOptions
 
 	if ($userChoices.Count -gt 0) {
 		Write-Status "`n--- Processing Selections ---" -ForegroundColor Cyan -Type Info
@@ -449,12 +544,23 @@ else {
 					try {
 						Write-Status "Updating $updateName..." -ForegroundColor Yellow -Type Info -Important
 						Write-Log "Attempting to update $id."
+						$extraArgs = ""
+						if ($null -ne $packageOptions) {
+							$val = $packageOptions.$($id)
+							if ($null -ne $val) {
+								if ($val -is [array]) {
+									$extraArgs = $val -join " "
+								}
+								else {
+									$extraArgs = $val
+								}
+							}
+						}
+						$cmd = "winget upgrade --id `"$($id)`" $extraArgs --accept-source-agreements --accept-package-agreements"
 						if ($Minimal) {
-							winget upgrade --id $id --accept-source-agreements --accept-package-agreements | Out-Null
+							$cmd += " | Out-Null"
 						}
-						else {
-							winget upgrade --id $id --accept-source-agreements --accept-package-agreements
-						}
+						Invoke-Expression $cmd
 						if ($LASTEXITCODE -ne 0) {
 							throw "WinGet failed to update $updateName (ID: $id)"
 						}
@@ -478,12 +584,23 @@ else {
 					try {
 						Write-Status "Updating $updateName..." -ForegroundColor Yellow -Type Info -Important
 						Write-Log "Attempting to update $id (and adding to forcelist)."
+						$extraArgs = ""
+						if ($null -ne $packageOptions) {
+							$val = $packageOptions.$($id)
+							if ($null -ne $val) {
+								if ($val -is [array]) {
+									$extraArgs = $val -join " "
+								}
+								else {
+									$extraArgs = $val
+								}
+							}
+						}
+						$cmd = "winget upgrade --id `"$($id)`" $extraArgs --accept-source-agreements --accept-package-agreements"
 						if ($Minimal) {
-							winget upgrade --id $id --accept-source-agreements --accept-package-agreements | Out-Null
+							$cmd += " | Out-Null"
 						}
-						else {
-							winget upgrade --id $id --accept-source-agreements --accept-package-agreements
-						}
+						Invoke-Expression $cmd
 						if ($LASTEXITCODE -ne 0) {
 							throw "WinGet failed to update $updateName (ID: $id)"
 						}
@@ -514,7 +631,7 @@ else {
 		}
 	}
 	else {
-		Write-Status "`nNo selections were made." -ForegroundColor Yellow -Type Info
+		Write-Status "`nNo selections were made." -ForegroundColor Green -Type Info
 	}
 }
 
@@ -523,6 +640,9 @@ $dataToSave = @{
 	Blocklist = @($blocklist)
 	Forcelist = @($forcelist)
 	LastRun   = (Get-Date).ToString("o")
+}
+if ($null -ne $packageOptions -and $packageOptions.Count -gt 0) {
+	$dataToSave["PackageOptions"] = $packageOptions
 }
 Save-Data -DataToSave $dataToSave -FilePath $DataFile
 
@@ -533,7 +653,7 @@ $hasValidData = ($whitelist.Count + $blocklist.Count + $forcelist.Count) -gt 0
 if (-not $Silent -and -not $Minimal -and $hasValidData) {
 	Invoke-Countdown -Seconds 5 `
 		-Message "Press 'E' to edit list, or Enter to exit (auto-exits in 5s)..." `
-		-Whitelist $whitelist -Blocklist $blocklist -Forcelist $forcelist | Out-Null
+		-Whitelist $whitelist -Blocklist $blocklist -Forcelist $forcelist -PackageOptions $packageOptions | Out-Null
 }
 elseif (-not $Silent -and -not $NoDelay -and -not $Minimal) {
 	Start-Sleep -Seconds 3

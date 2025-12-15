@@ -65,7 +65,7 @@ try {
 	$SourceDir = $PSScriptRoot
 
 	$PreviousVersion = Get-ConfigValue -Name "InstalledVersion" -Default $null
-	
+
 	if ($null -eq $PreviousVersion) {
 		Write-Host "Installing Winget Updater v$AppVersion" -ForegroundColor Cyan
 	}
@@ -160,14 +160,16 @@ try {
 		}
 	}
 	else {
-		$RunStartup = Read-Host "Run at system startup? ($(
+		$prompt = "Run at system startup? ($(
 			if ($StartupDefault -eq 'Y') {
 				'Y/n'
 			}
 			else {
 				'y/N'
 			}
-		))"
+		)): "
+		Write-Host $prompt -NoNewline -ForegroundColor Yellow
+		$RunStartup = Read-Host
 	}
 	if ([string]::IsNullOrWhiteSpace($RunStartup)) {
 		$RunStartup = if ($StartupDefault -eq "Y") {
@@ -187,14 +189,16 @@ try {
 		}
 	}
 	else {
-		$RunWake = Read-Host "Run on system wake/unlock? ($(
+		$prompt = "Run on system wake/unlock? ($(
 			if ($WakeDefault -eq 'Y') {
 				'Y/n'
 			}
 			else {
 				'y/N'
 			}
-		))"
+		)): "
+		Write-Host $prompt -NoNewline -ForegroundColor Yellow
+		$RunWake = Read-Host
 	}
 	if ([string]::IsNullOrWhiteSpace($RunWake)) {
 		$RunWake = if ($WakeDefault -eq "Y") {
@@ -232,7 +236,7 @@ try {
 
 	$SafeVbs = $VbsScript.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("`"", "&quot;")
 	$SafeTarget = $TargetScript.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("`"", "&quot;")
-	
+
 	$ArgString = "`"$SafeVbs`" `"$SafeTarget`""
 	$User = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
 
@@ -303,7 +307,7 @@ $Values_Triggers
 		else {
 			0
 		}
-		
+
 		Set-ConfigValue -Name "AutoStartup" -Value $startupValue
 		Set-ConfigValue -Name "AutoWake" -Value $wakeValue
 		Set-ConfigValue -Name "InstalledVersion" -Value $AppVersion
@@ -319,13 +323,14 @@ $Values_Triggers
 		$RunNow = "n"
 	}
 	else {
-		$RunNow = Read-Host "Run Winget Updater now? (y/N)"
+		Write-Host "Run Winget Updater now? (y/N): " -NoNewline -ForegroundColor Yellow
+		$RunNow = Read-Host
 	}
 	if ([string]::IsNullOrWhiteSpace($RunNow)) {
 		$RunNow = "n"
 	}
 	if ($RunNow -eq "y") {
-		Write-Host "Launching Winget Updater..." -ForegroundColor Cyan
+		Write-Host "Launching Winget Updater..." -ForegroundColor Yellow
 		Start-Process -FilePath "cmd.exe" -ArgumentList "/c start `"`" /min `"$InstallDir\launcher.bat`"" -WindowStyle Hidden
 	}
 }

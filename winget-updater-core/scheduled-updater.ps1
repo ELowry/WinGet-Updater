@@ -45,19 +45,22 @@ $actionableUpdates = $updates | Where-Object {
 
 if ($actionableUpdates.Count -eq 0) {
 	Write-Log "Scheduled check found no actionable updates. Updating LastRun."
-	
+
 	$whitelist = if ($data.Whitelist) {
 		$data.Whitelist
 	}
 	else {
 		@()
 	}
-	
+
 	$dataToSave = @{
 		Whitelist = $whitelist
 		Blocklist = $data.Blocklist
 		Forcelist = $data.Forcelist
 		LastRun   = (Get-Date).ToString("o")
+	}
+	if ($data.PackageOptions) {
+		$dataToSave["PackageOptions"] = $data.PackageOptions
 	}
 	Save-Data -DataToSave $dataToSave -FilePath $DataFile
 	exit
