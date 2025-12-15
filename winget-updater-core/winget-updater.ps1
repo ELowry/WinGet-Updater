@@ -294,6 +294,54 @@ finally {
 	}
 }
 
+# Check for Self-Update
+$SelfID = "EricLowry.WinGetUpdater"
+$selfUpdate = $allUpdates | Where-Object { $_.Id -eq $SelfID } | Select-Object -First 1
+
+if ($selfUpdate) {
+	Write-Status "`n[!] Update available for Winget Updater (v$($selfUpdate.AvailableVersion))" -ForegroundColor Cyan -Important
+	
+	$doSelfUpdate = $false
+
+	if (-not $Silent) {
+		Write-Host "    Update and restart application now? [Y/n] " -NoNewline -ForegroundColor Yellow
+		$response = Read-Host
+		if ($response -eq '' -or $response.ToLower().StartsWith('y')) {
+			$doSelfUpdate = $true
+		}
+	}
+
+	if ($doSelfUpdate) {
+		Write-Status "Preparing for self-update..." -Type Info
+
+		$batchPath = [System.IO.Path]::GetTempFileName() + ".bat"
+		$launcherPath = Join-Path $PSScriptRoot "launcher.bat"
+
+		$batchContent = @"
+@echo off
+cd /d "%TEMP%"
+echo Waiting for Winget Updater to close...
+timeout /t 3 /nobreak > NUL
+echo Updating Winget Updater...
+winget upgrade $SelfID --accept-source-agreements --accept-package-agreements
+if %errorlevel% equ 0 (
+	echo Update successful. Restarting...
+	start "" "$launcherPath"
+) else (
+	echo Update failed.
+	pause
+)
+del "%~f0"
+"@
+		Set-Content -Path $batchPath -Value $batchContent -Encoding Ascii
+		Start-Process "cmd.exe" -ArgumentList "/c `"$batchPath`"" -WindowStyle Normal -WorkingDirectory $env:TEMP
+		exit
+	}
+	
+	# If user said 'No', remove self from list to prevent crashes
+	$allUpdates = @($allUpdates | Where-Object { $_.Id -ne $SelfID })
+}
+
 $updatesToForce = @(
 	$allUpdates | Where-Object {
 		$_.Id -and $forcelist -contains $_.Id
