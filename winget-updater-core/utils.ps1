@@ -100,7 +100,7 @@ Function Save-Data {
 	}
 }
 
-Function Split-Arguments {
+Function Split-ArgumentList {
 	param([string]$InputString)
 	if ([string]::IsNullOrWhiteSpace($InputString)) {
 		return @()

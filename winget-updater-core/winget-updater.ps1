@@ -480,7 +480,7 @@ if ($updatesToForce.Count -gt 0) {
 						$wingetArgs += $val
 					}
 					else {
-						$wingetArgs += Split-Arguments $val
+						$wingetArgs += Split-ArgumentList $val
 					}
 				}
 			}
@@ -556,7 +556,7 @@ else {
 									$wingetArgs += $val
 								}
 								else {
-									$wingetArgs += Split-Arguments $val
+									$wingetArgs += Split-ArgumentList $val
 								}
 							}
 						}
@@ -600,7 +600,7 @@ else {
 									$wingetArgs += $val
 								}
 								else {
-									$wingetArgs += Split-Arguments $val
+									$wingetArgs += Split-ArgumentList $val
 								}
 							}
 						}
