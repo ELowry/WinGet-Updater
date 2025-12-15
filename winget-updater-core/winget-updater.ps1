@@ -302,7 +302,7 @@ if ($selfUpdate) {
 	Write-Status "`n[!] Update available for Winget Updater (v$($selfUpdate.AvailableVersion))" -ForegroundColor Cyan -Important
 	
 	$doSelfUpdate = $false
-
+	
 	if (-not $Silent) {
 		Write-Host "    Update and restart application now? [Y/n] " -NoNewline -ForegroundColor Yellow
 		$response = Read-Host
@@ -312,49 +312,68 @@ if ($selfUpdate) {
 	}
 
 	if ($doSelfUpdate) {
-		Write-Status "Preparing for self-update..." -Type Info
-
+		Write-Status "Spawning updater..." -Type Info
+		
 		$batchPath = [System.IO.Path]::GetTempFileName() + ".bat"
-		$launcherPath = Join-Path $PSScriptRoot "launcher.bat"
-
+		$installDir = $PSScriptRoot
+		
 		$batchContent = @"
 @echo off
 cd /d "%TEMP%"
+
+:RETRY_UPDATE
+cls
 echo Waiting for Winget Updater to close...
 timeout /t 3 /nobreak > NUL
+
 echo Updating Winget Updater...
 winget upgrade $SelfID --accept-source-agreements --accept-package-agreements
+
 if %errorlevel% equ 0 (
 	echo Update successful. Restarting...
-	start "" "$launcherPath"
+	
+	where wt >nul 2>&1
+	if %errorlevel% equ 0 (
+		start "" wt -w new powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$installDir\winget-updater.ps1"
+	) else (
+		start "" powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$installDir\winget-updater.ps1"
+	)
+	
+	(goto) 2>nul & del "%~f0"
 ) else (
-	echo Update failed.
-	pause
+	echo.
+	echo [!] Update failed.
+	echo This usually happens if the application folder is open in another console window.
+	echo.
+	echo Please close any open Explorer, Terminal, or PowerShell windows operating on:
+	echo "$installDir"
+	echo.
+	echo Press any key to try again...
+	pause >nul
+	goto RETRY_UPDATE
 )
-del "%~f0"
 "@
 		Set-Content -Path $batchPath -Value $batchContent -Encoding Ascii
 		Start-Process "cmd.exe" -ArgumentList "/c `"$batchPath`"" -WindowStyle Normal -WorkingDirectory $env:TEMP
 		exit
 	}
 	
-	# If user said 'No', remove self from list to prevent crashes
 	$allUpdates = @($allUpdates | Where-Object { $_.Id -ne $SelfID })
 }
 
 $updatesToForce = @(
 	$allUpdates | Where-Object {
-		$_.Id -and $forcelist -contains $_.Id
+		$_.Id -and $forcelist -contains $_.Id -and $_.Id -ne $SelfID
 	}
 )
 $blockedUpdates = @(
 	$allUpdates | Where-Object {
-		$_.Id -and $blocklist -contains $_.Id
+		$_.Id -and $blocklist -contains $_.Id -and $_.Id -ne $SelfID
 	}
 )
 $updatesToProcess = @(
 	$allUpdates | Where-Object {
-		$_.Id -and ($blocklist -notcontains $_.Id) -and ($forcelist -notcontains $_.Id)
+		$_.Id -and ($blocklist -notcontains $_.Id) -and ($forcelist -notcontains $_.Id) -and $_.Id -ne $SelfID
 	}
 )
 
