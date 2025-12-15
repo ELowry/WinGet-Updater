@@ -87,7 +87,7 @@ Function Save-Data {
 	try {
 		$DataToSave | ConvertTo-Json -Depth 5 | Out-File -FilePath $TempFile -Encoding utf8
 		Move-Item -Path $TempFile -Destination $FilePath -Force
-		Write-Status "Data saved successfully." -Type Info
+		Write-Status "Data saved successfully." -Type Info -ForegroundColor Green
 	}
 	catch {
 		Write-Log "Failed to save data: $($_.Exception.Message)"
@@ -101,12 +101,12 @@ Function Save-Data {
 }
 
 Function Get-WinGetUpdate {
-	Write-Status "Checking for available updates..." -Type Info
+	Write-Status "Checking for available updates..." -Type Info -ForegroundColor Yellow
 	Write-Log "Checking for WinGet updates."
 	try {
 		Write-Log "Updating WinGet sources..."
-		Write-Status "Updating WinGet sources... (This may take a moment)" -Type Info
-		
+		Write-Status "Updating WinGet sources... (This may take a moment)" -Type Info -ForegroundColor Yellow
+
 		$proc = Start-Process winget -ArgumentList "source update" -NoNewWindow -PassThru -Wait
 		if ($proc.ExitCode -ne 0) {
 			Write-Log "WinGet source update returned exit code $($proc.ExitCode)."
@@ -114,14 +114,14 @@ Function Get-WinGetUpdate {
 		Write-Log "WinGet sources updated."
 
 		Write-Log "Running 'winget upgrade' to find available updates."
-		Write-Status "Querying for available package updates..." -Type Info
+		Write-Status "Querying for available package updates..." -Type Info -ForegroundColor Yellow
 		[System.Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 		$wingetOutput = winget upgrade | Where-Object {
 			-not [string]::IsNullOrWhiteSpace($_)
 		}
-			
+
 		$updates = @()
-			
+
 		$headerLine = $wingetOutput | Where-Object {
 			$_ -like 'Name*Id*Version*'
 		} | Select-Object -First 1
