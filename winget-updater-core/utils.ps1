@@ -100,6 +100,26 @@ Function Save-Data {
 	}
 }
 
+Function Split-Arguments {
+	param([string]$InputString)
+	if ([string]::IsNullOrWhiteSpace($InputString)) {
+		return @()
+	}
+
+	# Matches quoted strings or non-whitespace sequences
+	$regex = [regex] '([^\s"]+|"([^"]*)")'
+	$matchCollection = $regex.Matches($InputString)
+	$argsList = @()
+	foreach ($m in $matchCollection) {
+		$val = $m.Value
+		if ($val.StartsWith('"') -and $val.EndsWith('"')) {
+			$val = $val.Substring(1, $val.Length - 2)
+		}
+		$argsList += $val
+	}
+	return $argsList
+}
+
 Function Get-WinGetUpdate {
 	Write-Status "Checking for available updates..." -Type Info -ForegroundColor Yellow
 	Write-Log "Checking for WinGet updates."

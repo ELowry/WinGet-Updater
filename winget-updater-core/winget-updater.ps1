@@ -472,23 +472,27 @@ if ($updatesToForce.Count -gt 0) {
 	foreach ($update in $updatesToForce) {
 		Write-Status "Updating $($update.Name)..." -ForegroundColor Yellow -Type Info -Important
 		try {
-			$extraArgs = ""
+			$wingetArgs = @("upgrade", "--id", "$($update.Id)")
 			if ($null -ne $packageOptions) {
 				$val = $packageOptions.$($update.Id)
 				if ($null -ne $val) {
 					if ($val -is [array]) {
-						$extraArgs = $val -join " "
+						$wingetArgs += $val
 					}
 					else {
-						$extraArgs = $val
+						$wingetArgs += Split-Arguments $val
 					}
 				}
 			}
-			$cmd = "winget upgrade --id `"$($update.Id)`" $extraArgs --accept-source-agreements --accept-package-agreements"
+			$wingetArgs += "--accept-source-agreements"
+			$wingetArgs += "--accept-package-agreements"
+
 			if ($Minimal) {
-				$cmd += " | Out-Null"
+				& winget @wingetArgs | Out-Null
 			}
-			Invoke-Expression $cmd
+			else {
+				& winget @wingetArgs
+			}
 			if ($LASTEXITCODE -ne 0) {
 				throw "WinGet failed to update $($update.Name) (ID: $($update.Id))"
 			}
@@ -544,23 +548,27 @@ else {
 					try {
 						Write-Status "Updating $updateName..." -ForegroundColor Yellow -Type Info -Important
 						Write-Log "Attempting to update $id."
-						$extraArgs = ""
+						$wingetArgs = @("upgrade", "--id", "$($id)")
 						if ($null -ne $packageOptions) {
 							$val = $packageOptions.$($id)
 							if ($null -ne $val) {
 								if ($val -is [array]) {
-									$extraArgs = $val -join " "
+									$wingetArgs += $val
 								}
 								else {
-									$extraArgs = $val
+									$wingetArgs += Split-Arguments $val
 								}
 							}
 						}
-						$cmd = "winget upgrade --id `"$($id)`" $extraArgs --accept-source-agreements --accept-package-agreements"
+						$wingetArgs += "--accept-source-agreements"
+						$wingetArgs += "--accept-package-agreements"
+
 						if ($Minimal) {
-							$cmd += " | Out-Null"
+							& winget @wingetArgs | Out-Null
 						}
-						Invoke-Expression $cmd
+						else {
+							& winget @wingetArgs
+						}
 						if ($LASTEXITCODE -ne 0) {
 							throw "WinGet failed to update $updateName (ID: $id)"
 						}
@@ -584,23 +592,27 @@ else {
 					try {
 						Write-Status "Updating $updateName..." -ForegroundColor Yellow -Type Info -Important
 						Write-Log "Attempting to update $id (and adding to forcelist)."
-						$extraArgs = ""
+						$wingetArgs = @("upgrade", "--id", "$($id)")
 						if ($null -ne $packageOptions) {
 							$val = $packageOptions.$($id)
 							if ($null -ne $val) {
 								if ($val -is [array]) {
-									$extraArgs = $val -join " "
+									$wingetArgs += $val
 								}
 								else {
-									$extraArgs = $val
+									$wingetArgs += Split-Arguments $val
 								}
 							}
 						}
-						$cmd = "winget upgrade --id `"$($id)`" $extraArgs --accept-source-agreements --accept-package-agreements"
+						$wingetArgs += "--accept-source-agreements"
+						$wingetArgs += "--accept-package-agreements"
+
 						if ($Minimal) {
-							$cmd += " | Out-Null"
+							& winget @wingetArgs | Out-Null
 						}
-						Invoke-Expression $cmd
+						else {
+							& winget @wingetArgs
+						}
 						if ($LASTEXITCODE -ne 0) {
 							throw "WinGet failed to update $updateName (ID: $id)"
 						}
