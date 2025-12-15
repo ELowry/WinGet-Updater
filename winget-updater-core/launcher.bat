@@ -4,15 +4,6 @@
 :: https://opensource.org/licenses/MIT
 
 @echo off
-net session >nul 2>&1
-if %errorLevel% == 0 (
-	echo Administrative rights confirmed.
-) else (
-	echo Requesting administrative privileges...
-	powershell -Command "Start-Process '%~f0' -Verb RunAs"
-	exit /b
-)
-
 cd /d "%~dp0"
 
 where wt >nul 2>&1
