@@ -51,7 +51,6 @@ try {
 	$AppName = "Winget Updater"
 	$AppVersion = Get-AppVersion
 
-	# Check for online update
 	Find-OnlineUpdate -CurrentVersion $AppVersion
 	$InstallDir = "$env:LOCALAPPDATA\WingetUpdater"
 	$SourceDir = $PSScriptRoot

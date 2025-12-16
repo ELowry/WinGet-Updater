@@ -359,7 +359,7 @@ if (-not $Silent -and -not $Minimal -and $hasValidData) {
 		-Whitelist $whitelist -Blocklist $blocklist -Forcelist $forcelist -PackageOptions $packageOptions | Out-Null
 }
 
-if (-not $Silent -and -not $Minimal) {
+if (-not $Silent) {
 	Find-OnlineUpdate -CurrentVersion $AppVersion
 }
 
