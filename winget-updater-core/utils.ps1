@@ -11,6 +11,28 @@ param()
 $DataFile = Join-Path $PSScriptRoot "winget-updater-data.json"
 $LogFile = Join-Path $PSScriptRoot "winget-updater-log.txt"
 
+Function Get-AppVersion {
+	$versionFilePath = if (Test-Path "$PSScriptRoot\version.isi") {
+		"$PSScriptRoot\version.isi"
+	}
+	elseif (Test-Path "$PSScriptRoot\..\installer\version.isi") {
+		"$PSScriptRoot\..\installer\version.isi"
+	}
+	else {
+		return "Unknown"
+	}
+	
+	try {
+		$versionLine = Get-Content $versionFilePath -ErrorAction Stop | Select-String '#define AppVersion' | Select-Object -First 1
+		if ($versionLine) {
+			return ($versionLine.Line -replace '.*"(.*)".*', '$1')
+		}
+	}
+	catch {
+		return "Unknown"
+	}
+}
+
 Function Get-LastRunDate {
 	param([psobject]$Data)
 
@@ -120,6 +142,39 @@ Function Split-ArgumentList {
 	return $argsList
 }
 
+
+Function Find-OnlineUpdate {
+	param(
+		[string]$CurrentVersion,
+		[string]$RepoOwner = "ELowry",
+		[string]$RepoName = "WinGet-Updater"
+	)
+
+	try {
+		$apiUrl = "https://api.github.com/repos/$RepoOwner/$RepoName/releases/latest"
+		$response = Invoke-RestMethod -Uri $apiUrl -Method Get -TimeoutSec 3 -ErrorAction Stop
+		
+		if ($null -eq $response -or $null -eq $response.tag_name) {
+			return
+		}
+
+		$latestTag = $response.tag_name -replace "^v", ""
+		$currentVer = $CurrentVersion -replace "^v", ""
+		
+		if ([System.Version]$latestTag -gt [System.Version]$currentVer) {
+			Write-Status "`n[!] New version available: $($response.tag_name)" -ForegroundColor Yellow -Important
+			Write-Status "    Download at: $($response.html_url)" -ForegroundColor Cyan -Important
+			Write-Host ""
+			Write-Host "Press Enter to continue..." -NoNewline -ForegroundColor Gray
+			$null = Read-Host
+			Write-Host ""
+		}
+	}
+	catch {
+		Write-Log "Failed to check for updates: $($_.Exception.Message)"
+	}
+}
+
 Function Get-WinGetUpdate {
 	Write-Status "Checking for available updates..." -Type Info -ForegroundColor Yellow
 	Write-Log "Checking for WinGet updates."
@@ -180,7 +235,7 @@ Function Get-WinGetUpdate {
 						Name             = $name
 						Id               = $id
 						Version          = $version
-						AvailableVersion = $available
+						AvailableVersion	= $available
 					}
 				}
 			}

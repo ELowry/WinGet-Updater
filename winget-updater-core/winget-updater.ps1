@@ -17,6 +17,8 @@ param(
 
 . "$PSScriptRoot\utils.ps1"
 
+$AppVersion = Get-AppVersion
+
 Function Show-Header {
 	if (-not $Silent) {
 		Write-Host "============================" -ForegroundColor Cyan
@@ -357,6 +359,10 @@ if (-not $Silent -and -not $Minimal -and $hasValidData) {
 		-Whitelist $whitelist -Blocklist $blocklist -Forcelist $forcelist -PackageOptions $packageOptions | Out-Null
 }
 
+if (-not $Silent -and -not $Minimal) {
+	Find-OnlineUpdate -CurrentVersion $AppVersion
+}
+
 try {
 	if ($CachePath -and (Test-Path $CachePath)) {
 		Write-Status "Loading cached update data..." -Type Info -ForegroundColor Yellow
@@ -376,94 +382,19 @@ finally {
 	}
 }
 
-# Check for Self-Update
-$SelfID = "EricLowry.WinGetUpdater"
-$selfUpdate = $allUpdates | Where-Object { $_.Id -eq $SelfID } | Select-Object -First 1
-
-if ($selfUpdate) {
-	Write-Status "`n[!] Update available for Winget Updater (v$($selfUpdate.AvailableVersion))" -ForegroundColor Yellow -Important
-
-	$doSelfUpdate = $false
-
-	if (-not $Silent) {
-		Write-Host "    Update and restart application now? [Y/n] " -NoNewline -ForegroundColor Yellow
-		$response = Read-Host
-		if ($response -eq '' -or $response.ToLower().StartsWith('y')) {
-			$doSelfUpdate = $true
-		}
-	}
-
-	if ($doSelfUpdate) {
-		Write-Status "Spawning updater..." -Type Info -ForegroundColor Yellow
-
-		$batchPath = [System.IO.Path]::GetTempFileName() + ".bat"
-		$installDir = $PSScriptRoot
-
-		$batchContent = @"
-@echo off
-cd /d "%TEMP%"
-
-:RETRY_UPDATE
-cls
-echo Waiting for Winget Updater to close...
-timeout /t 3 /nobreak > NUL
-
-echo Updating Winget Updater...
-winget upgrade $SelfID --accept-source-agreements --accept-package-agreements
-
-if errorlevel 1 goto UPDATE_FAILED
-
-echo Update successful. Restarting...
-
-where wt >nul 2>&1
-if errorlevel 1 goto NO_WT
-
-:HAS_WT
-start "" wt -w new powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$installDir\winget-updater.ps1"
-goto FINISH
-
-:NO_WT
-start "" powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$installDir\winget-updater.ps1"
-goto FINISH
-
-:UPDATE_FAILED
-echo.
-echo [!] Update failed.
-echo This usually happens if the application folder is open in another console window.
-echo.
-echo Please close any open Explorer, Terminal, or PowerShell windows operating on:
-echo "$installDir"
-echo.
-echo Press any key to try again...
-pause >nul
-goto RETRY_UPDATE
-
-:FINISH
-(goto) 2>nul & del "%~f0"
-"@
-		Set-Content -Path $batchPath -Value $batchContent -Encoding Ascii
-		Start-Process "cmd.exe" -ArgumentList "/c `"$batchPath`"" -WindowStyle Normal -WorkingDirectory $env:TEMP
-		exit
-	}
-
-	$allUpdates = @($allUpdates | Where-Object {
-			$_.Id -ne $SelfID
-		})
-}
-
 $updatesToForce = @(
 	$allUpdates | Where-Object {
-		$_.Id -and $forcelist -contains $_.Id -and $_.Id -ne $SelfID
+		$_.Id -and $forcelist -contains $_.Id
 	}
 )
 $blockedUpdates = @(
 	$allUpdates | Where-Object {
-		$_.Id -and $blocklist -contains $_.Id -and $_.Id -ne $SelfID
+		$_.Id -and $blocklist -contains $_.Id
 	}
 )
 $updatesToProcess = @(
 	$allUpdates | Where-Object {
-		$_.Id -and ($blocklist -notcontains $_.Id) -and ($forcelist -notcontains $_.Id) -and $_.Id -ne $SelfID
+		$_.Id -and ($blocklist -notcontains $_.Id) -and ($forcelist -notcontains $_.Id)
 	}
 )
 

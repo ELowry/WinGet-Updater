@@ -47,20 +47,12 @@ function Set-ConfigValue {
 }
 
 try {
+	. "$PSScriptRoot\utils.ps1"
 	$AppName = "Winget Updater"
-	$versionFilePath = if (Test-Path "$PSScriptRoot\version.isi") {
-		"$PSScriptRoot\version.isi"
-	}
- else {
-		"$PSScriptRoot\..\installer\version.isi"
-	}
-	$versionLine = Get-Content $versionFilePath | Select-String '#define AppVersion'
-	$AppVersion = if ($versionLine) {
-		$versionLine.Line -replace '.*"(.*)".*', '$1'
-	}
- else {
-		"Unknown"
-	}
+	$AppVersion = Get-AppVersion
+
+	# Check for online update
+	Find-OnlineUpdate -CurrentVersion $AppVersion
 	$InstallDir = "$env:LOCALAPPDATA\WingetUpdater"
 	$SourceDir = $PSScriptRoot
 
