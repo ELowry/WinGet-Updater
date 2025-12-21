@@ -68,6 +68,14 @@ Function Show-EditMode {
 
 			Write-Host "[$($i+1)] $id " -NoNewline -ForegroundColor White
 			Write-Host "[$status]" -ForegroundColor $color
+
+			if ($null -ne $PackageOptions -and $PackageOptions.Contains($id)) {
+				$opts = $PackageOptions[$id]
+				if ($opts -is [array]) { $opts = $opts -join " " }
+				if (-not [string]::IsNullOrWhiteSpace($opts)) {
+					Write-Host "      Args: $opts" -ForegroundColor DarkGray
+				}
+			}
 		}
 
 		Write-Host "`nEnter number to edit, or 'q' to save and exit."
@@ -92,14 +100,29 @@ Function Show-EditMode {
 			$action = Read-Host
 			$action = $action.ToLower()
 
-			if ($Whitelist.Contains($selectedId)) {
-				$Whitelist.Remove($selectedId)
+			if ($action -eq 'f') {
+				Write-Host "Verifying version..." -ForegroundColor DarkGray
+				Repair-RegistryVersionError
+				$listOutput = winget list --id $selectedId --exact 2>&1 | Out-String
+				if ($listOutput -match "\sUnknown\s") {
+					Write-Host "Cannot set to Always Run: App version is 'Unknown'." -ForegroundColor Red
+					Write-Host "Forcing updates for unknown versions can cause infinite loops." -ForegroundColor Yellow
+					Write-Host "Press any key to continue..." -ForegroundColor Gray
+					$null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+					continue
+				}
 			}
-			if ($Blocklist.Contains($selectedId)) {
-				$Blocklist.Remove($selectedId)
-			}
-			if ($Forcelist.Contains($selectedId)) {
-				$Forcelist.Remove($selectedId)
+
+			if ($action -ne 'o') {
+				if ($Whitelist.Contains($selectedId)) {
+					$Whitelist.Remove($selectedId)
+				}
+				if ($Blocklist.Contains($selectedId)) {
+					$Blocklist.Remove($selectedId)
+				}
+				if ($Forcelist.Contains($selectedId)) {
+					$Forcelist.Remove($selectedId)
+				}
 			}
 
 			switch ($action) {
@@ -183,7 +206,21 @@ Function Show-UpdateMenu {
 		Write-Host $update.Name -ForegroundColor White
 		Write-Host "  $($update.Version) -> $($update.AvailableVersion)" -ForegroundColor DarkGray
 
-		$prompt = "  Choose action: [R]un, [A]lways run, [S]kip, [B]lock, [O]ptions (Default is '$defaultWord')"
+		$isUnknownVersion = $update.Version -eq 'Unknown'
+		
+		$promptPrefix = "  Choose action: [R]un"
+		$validChoices = @('r', 's', 'b', 'o')
+
+		if (-not $isUnknownVersion) {
+			$promptPrefix += ", [A]lways run"
+			$validChoices += 'a'
+		}
+		
+		$prompt = "$promptPrefix, [S]kip, [B]lock, [O]ptions (Default is '$defaultWord')"
+
+		if ($isUnknownVersion) {
+			Write-Host "  (Note: 'Always run' is disabled because the current version is Unknown)" -ForegroundColor DarkGray
+		}
 
 		$actionChoice = $null
 		while ($null -eq $actionChoice) {
@@ -194,7 +231,7 @@ Function Show-UpdateMenu {
 					$response = $defaultChar
 				}
 				$response = $response.ToLower()
-			} while ($response -notin @('r', 'a', 's', 'b', 'o'))
+			} while ($response -notin $validChoices)
 
 			if ($response -eq 'o') {
 				$current = if ($null -ne $PackageOptions -and $PackageOptions.Contains($update.Id)) {
@@ -327,17 +364,32 @@ if (Test-Path $DataFile) {
 
 $whitelist = [System.Collections.ArrayList]::new()
 if ($null -ne $data -and $data.Whitelist) {
-	$whitelist.AddRange(@($data.Whitelist))
+	$validItems = @($data.Whitelist) | Where-Object {
+		$_ -is [string] -and -not [string]::IsNullOrWhiteSpace($_)
+	}
+	foreach ($item in $validItems) {
+		[void]$whitelist.Add($item)
+	}
 }
 
 $blocklist = [System.Collections.ArrayList]::new()
 if ($null -ne $data -and $data.Blocklist) {
-	$blocklist.AddRange(@($data.Blocklist))
+	$validItems = @($data.Blocklist) | Where-Object {
+		$_ -is [string] -and -not [string]::IsNullOrWhiteSpace($_)
+	}
+	foreach ($item in $validItems) {
+		[void]$blocklist.Add($item)
+	}
 }
 
 $forcelist = [System.Collections.ArrayList]::new()
 if ($null -ne $data -and $data.Forcelist) {
-	$forcelist.AddRange(@($data.Forcelist))
+	$validItems = @($data.Forcelist) | Where-Object {
+		$_ -is [string] -and -not [string]::IsNullOrWhiteSpace($_)
+	}
+	foreach ($item in $validItems) {
+		[void]$forcelist.Add($item)
+	}
 }
 
 $packageOptions = @{}
