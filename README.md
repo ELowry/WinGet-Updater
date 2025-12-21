@@ -26,11 +26,14 @@ Winget Updater takes the headache out of keeping your software up-to-date. It si
 1. **Download the latest version of `WinGet-Updater.zip`** from the [Releases tab](../../releases/latest).
 2. Extract the files.
 3. Double-click `install-winget-updater.bat`.
-> [!NOTE]
-> This will ask for administrator permissions to set up the automation.
+
+   > [!NOTE]
+   > This will ask for administrator permissions to set up the automation.
+
 4. Follow the simple on-screen prompts to choose your automation settings (Run at Startup / Wake).
-> [!IMPORTANT]
-> You can now delete the downloaded files.
+
+   > [!IMPORTANT]
+   > You can now delete the downloaded files.
 
 ## Usage
 
@@ -40,8 +43,9 @@ If you ever want to check for updates manually or change your settings:
 
 1. Open your Start Menu.
 2. Search for **Winget Updater** and run it.
-> [!TIP]
-> If you press E during the short delay at the start of the script or after it has finished, you will be given the option to edit the settings for previously encountered applications.
+
+   > [!TIP]
+   > If you press E during the short delay at the start of the script or after it has finished, you will be given the option to edit the settings for previously encountered applications.
 
 ### Advanced Usage (command line)
 
