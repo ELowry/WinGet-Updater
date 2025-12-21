@@ -217,15 +217,15 @@ Function Clear-Lock {
 
 
 Function Find-OnlineUpdate {
-	if ($Unattended) {
-		return
-	}
-
 	param(
 		[string]$CurrentVersion,
 		[string]$RepoOwner = "ELowry",
 		[string]$RepoName = "WinGet-Updater"
 	)
+
+	if ($Silent -or $Unattended) {
+		return
+	}
 
 	try {
 		$apiUrl = "https://api.github.com/repos/$RepoOwner/$RepoName/releases/latest"

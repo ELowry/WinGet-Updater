@@ -95,7 +95,7 @@ var
 begin
   if CurStep = ssPostInstall then
   begin
-    Params := '-ExecutionPolicy Bypass -File "' + ExpandConstant('{tmp}\configure.ps1') + '" ' + GetParams('');
+    Params := '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' + ExpandConstant('{tmp}\configure.ps1') + '" ' + GetParams('');
     if not Exec('powershell.exe', Params, '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
     begin
        MsgBox('Failed to launch configuration script.', mbError, MB_OK);
