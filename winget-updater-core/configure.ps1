@@ -9,7 +9,8 @@
 param(
 	[switch]$Unattended,
 	[switch]$EnableStartup,
-	[switch]$EnableWake
+	[switch]$EnableWake,
+	[switch]$Forced
 )
 
 $ConfigRegPath = "HKCU:\Software\EricLowry\WingetUpdater\Config"
@@ -54,6 +55,19 @@ try {
 	Find-OnlineUpdate -CurrentVersion $AppVersion
 	$InstallDir = "$env:LOCALAPPDATA\WingetUpdater"
 	$SourceDir = $PSScriptRoot
+
+	$TargetLockFile = Join-Path $InstallDir "winget-updater.lock"
+	if (Test-Path $TargetLockFile) {
+		if (-not $Forced) {
+			Write-Host "Error: Winget Updater appears to be running in '$InstallDir'." -ForegroundColor Red
+			Write-Host "Please close it before continuing, or run this script with -Forced." -ForegroundColor Yellow
+			exit 1
+		}
+		else {
+			Write-Host "Overriding existing lock file as requested." -ForegroundColor Gray
+			Remove-Item $TargetLockFile -Force -ErrorAction SilentlyContinue
+		}
+	}
 
 	$PreviousVersion = Get-ConfigValue -Name "InstalledVersion" -Default $null
 

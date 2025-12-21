@@ -11,3 +11,6 @@
 # Publishing utility
 /.winget-submission
 /publish.ps1
+
+# Lock file
+/winget-updater-core/*.lock

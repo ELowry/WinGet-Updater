@@ -10,6 +10,7 @@ param()
 
 $DataFile = Join-Path $PSScriptRoot "winget-updater-data.json"
 $LogFile = Join-Path $PSScriptRoot "winget-updater-log.txt"
+$LockFile = Join-Path $PSScriptRoot "winget-updater.lock"
 
 Function Get-AppVersion {
 	$versionFilePath = if (Test-Path "$PSScriptRoot\version.isi") {
@@ -95,9 +96,10 @@ Function Write-Log {
 	try {
 		"[$Timestamp] $Message" | Out-File -FilePath $LogFile -Append -ErrorAction SilentlyContinue
 	}
- catch {
+	catch {
 		Write-Status "Error logging message: $Message" -ForegroundColor Red -Type Error
 	}
+
 }
 
 Function Save-Data {
@@ -142,6 +144,70 @@ Function Split-ArgumentList {
 	return $argsList
 }
 
+Function Request-Lock {
+	param(
+		[switch]$Forced,
+		[switch]$Silent
+	)
+
+	if (Test-Path $LockFile) {
+		if (-not $Forced) {
+			try {
+				$lockContent = Get-Content $LockFile -Raw -ErrorAction Stop
+				if ([string]::IsNullOrWhiteSpace($lockContent)) {
+					throw "Lock file is empty."
+				}
+				$lockTime = [DateTime]::Parse($lockContent.Trim(), $null, [System.Globalization.DateTimeStyles]::RoundtripKind)
+				if ((Get-Date) -lt $lockTime.AddHours(2)) {
+					if (-not $Silent) {
+						Write-Host "Warning: Another instance of WinGet Updater is already running (locked since $($lockTime.ToString('HH:mm:ss')))." -ForegroundColor Yellow
+						Write-Host "This usually happens if you've already opened the updater or if a previous instance crashed." -ForegroundColor Gray
+						Write-Host ""
+						Write-Host "Do you want to start anyway? (y/N): " -NoNewline -ForegroundColor Yellow
+						$response = Read-Host
+						if ($response -eq 'y') {
+							Write-Log "Lock override bypassed via user prompt."
+						}
+						else {
+							return $false
+						}
+					}
+					else {
+						return $false
+					}
+				}
+				else {
+					Write-Status "An old lock file was found (over 2 hours old). Proceeding..." -Type Info -ForegroundColor Gray
+				}
+
+			}
+			catch {
+				Write-Log "Error checking lock file: $($_.Exception.Message)"
+				Write-Status "Error checking lock file: $($_.Exception.Message)" -ForegroundColor Red -Type Error
+				return $false # Fail safe: if we can't check the lock, assume it's locked
+			}
+		}
+		else {
+			Write-Log "Lock override forced."
+		}
+	}
+
+	try {
+		Get-Date -Format "o" | Out-File -FilePath $LockFile -Encoding utf8 -ErrorAction Stop
+		return $true
+	}
+	catch {
+		Write-Log "Failed to create lock file: $($_.Exception.Message)"
+		return $false
+	}
+}
+
+Function Clear-Lock {
+	if (Test-Path $LockFile) {
+		Remove-Item $LockFile -Force -ErrorAction SilentlyContinue
+	}
+}
+
 
 Function Find-OnlineUpdate {
 	param(
@@ -159,9 +225,13 @@ Function Find-OnlineUpdate {
 		}
 
 		$latestTag = $response.tag_name -replace "^v", ""
-		$currentVer = $CurrentVersion -replace "^v", ""
-		
-		if ([System.Version]$latestTag -gt [System.Version]$currentVer) {
+		$latestTagClean = $response.tag_name -replace "^v", ""
+		if ($latestTagClean -notmatch "\.") { $latestTagClean += ".0" }
+
+		$currentVerClean = $CurrentVersion -replace "^v", ""
+		if ($currentVerClean -notmatch "\.") { $currentVerClean += ".0" }
+
+		if ([System.Version]$latestTagClean -gt [System.Version]$currentVerClean) {
 			Write-Status "`n[!] New version available: $($response.tag_name)" -ForegroundColor Yellow -Important
 			Write-Status "    Download at: $($response.html_url)" -ForegroundColor Cyan -Important
 			Write-Host ""

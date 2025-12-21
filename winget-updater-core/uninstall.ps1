@@ -7,7 +7,9 @@
 
 [CmdletBinding()]
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSAvoidUsingWriteHost", "")]
-param()
+param(
+	[switch]$Forced
+)
 
 $AppName = "Winget Updater"
 $InstallDir = "$env:LOCALAPPDATA\WingetUpdater"
@@ -25,6 +27,19 @@ if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
 		Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs
 	}
 	exit
+}
+
+$LockFile = Join-Path $InstallDir "winget-updater.lock"
+if (Test-Path $LockFile) {
+	if (-not $Forced) {
+		Write-Host "Error: Winget Updater appears to be running." -ForegroundColor Red
+		Write-Host "Please close it before uninstalling, or run with -Forced." -ForegroundColor Yellow
+		exit 1
+	}
+	else {
+		Write-Host "Overriding lock file as requested." -ForegroundColor Gray
+		Remove-Item $LockFile -Force -ErrorAction SilentlyContinue
+	}
 }
 
 Write-Host "Uninstalling $AppName..." -ForegroundColor Cyan

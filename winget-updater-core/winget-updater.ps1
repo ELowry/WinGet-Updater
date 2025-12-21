@@ -12,6 +12,7 @@ param(
 	[switch]$Silent,
 	[switch]$Minimal,
 	[switch]$NoDelay,
+	[switch]$Forced,
 	[string]$CachePath
 )
 
@@ -353,251 +354,270 @@ if ($null -ne $data -and $null -ne $data.PackageOptions) {
 
 $hasValidData = ($whitelist.Count + $blocklist.Count + $forcelist.Count) -gt 0
 
-if (-not $Silent -and -not $Minimal -and $hasValidData) {
-	Invoke-Countdown -Seconds 2 `
-		-Message "Press 'E' to edit list, or Enter to run updater (auto-starts in 2s)..." `
-		-Whitelist $whitelist -Blocklist $blocklist -Forcelist $forcelist -PackageOptions $packageOptions | Out-Null
+if (-not (Request-Lock -Forced:$Forced -Silent:$Silent)) {
+	exit
 }
 
-if (-not $Silent) {
-	Find-OnlineUpdate -CurrentVersion $AppVersion
+# Register a handler to clear the lock if the script is manually interrupted (Ctrl+C)
+$controlCHandler = {
+	Clear-Lock
 }
+[System.Console]::add_CancelKeyPress($controlCHandler)
+Register-EngineEvent -SourceIdentifier PowerShell.Exiting -Action { Clear-Lock } | Out-Null
+
 
 try {
-	if ($CachePath -and (Test-Path $CachePath)) {
-		Write-Status "Loading cached update data..." -Type Info -ForegroundColor Yellow
-		$allUpdates = Get-Content $CachePath | ConvertFrom-Json
+	if (-not $Silent -and -not $Minimal -and $hasValidData) {
+		Invoke-Countdown -Seconds 2 `
+			-Message "Press 'E' to edit list, or Enter to run updater (auto-starts in 2s)..." `
+			-Whitelist $whitelist -Blocklist $blocklist -Forcelist $forcelist -PackageOptions $packageOptions | Out-Null
+	}
+
+	if (-not $Silent) {
+		Find-OnlineUpdate -CurrentVersion $AppVersion
+	}
+
+	try {
+		if ($CachePath -and (Test-Path $CachePath)) {
+			Write-Status "Loading cached update data..." -Type Info -ForegroundColor Yellow
+			$allUpdates = Get-Content $CachePath | ConvertFrom-Json
+		}
+		else {
+			$allUpdates = Get-WinGetUpdate
+		}
+	}
+	catch {
+		Write-Status "Error loading update data." -Type Error
+		$allUpdates = @()
+	}
+	finally {
+		if ($CachePath -and (Test-Path $CachePath)) {
+			Remove-Item $CachePath -Force -ErrorAction SilentlyContinue
+		}
+	}
+
+	$updatesToForce = @(
+		$allUpdates | Where-Object {
+			$_.Id -and $forcelist -contains $_.Id
+		}
+	)
+	$blockedUpdates = @(
+		$allUpdates | Where-Object {
+			$_.Id -and $blocklist -contains $_.Id
+		}
+	)
+	$updatesToProcess = @(
+		$allUpdates | Where-Object {
+			$_.Id -and ($blocklist -notcontains $_.Id) -and ($forcelist -notcontains $_.Id)
+		}
+	)
+
+	if ($updatesToForce.Count -gt 0) {
+		Write-Status "--- Automatically updating packages from forcelist ---" -ForegroundColor Magenta -Type Info -Important
+		foreach ($update in $updatesToForce) {
+			Write-Status "Updating $($update.Name)..." -ForegroundColor Yellow -Type Info -Important
+			try {
+				$wingetArgs = @("upgrade", "--id", "$($update.Id)")
+				if ($null -ne $packageOptions) {
+					$val = $packageOptions.$($update.Id)
+					if ($null -ne $val) {
+						if ($val -is [array]) {
+							$wingetArgs += $val
+						}
+						else {
+							$wingetArgs += Split-ArgumentList $val
+						}
+					}
+				}
+				$wingetArgs += "--accept-source-agreements"
+				$wingetArgs += "--accept-package-agreements"
+
+				if ($Minimal) {
+					& winget @wingetArgs | Out-Null
+				}
+				else {
+					& winget @wingetArgs
+				}
+				if ($LASTEXITCODE -ne 0) {
+					throw "WinGet failed to update $($update.Name) (ID: $($update.Id))"
+				}
+			}
+			catch {
+				Write-Status "  -> FAILED to update $($update.Name)." -ForegroundColor Red -Type Error
+				Write-Log "Error updating $($update.Id): $($_.Exception.Message)"
+			}
+		}
+	}
+
+	if ($blockedUpdates.Count -gt 0) {
+		Write-Status "`n--- Skipping blocked packages ---" -ForegroundColor Red -Type Info
+		if (-not $Silent -and -not $Minimal) {
+			$blockedUpdates.Name | ForEach-Object {
+				Write-Host " - $_"
+			}
+		}
+	}
+
+	if ($updatesToProcess.Count -eq 0) {
+		Write-Log "No updates to process after filtering."
+		Write-Status "`nNo new updates to review." -Type Info -ForegroundColor Green
 	}
 	else {
-		$allUpdates = Get-WinGetUpdate
+		$userChoices = Show-UpdateMenu -Updates $updatesToProcess -Whitelist $whitelist -PackageOptions $packageOptions
+
+		if ($userChoices.Count -gt 0) {
+			Write-Status "`n--- Processing Selections ---" -ForegroundColor Cyan -Type Info
+			foreach ($id in $userChoices.Keys) {
+				$choice = $userChoices[$id]
+				$update = $updatesToProcess | Where-Object {
+					$_.Id -eq $id
+				} | Select-Object -First 1
+				$updateName = if ($update) {
+					$update.Name
+				}
+				else {
+					$id
+				}
+
+				switch ($choice) {
+					"Run" {
+						if (-not $whitelist.Contains($id)) {
+							$whitelist.Add($id) | Out-Null
+						}
+						if ($blocklist.Contains($id)) {
+							$blocklist.Remove($id)
+						}
+						if ($forcelist.Contains($id)) {
+							$forcelist.Remove($id)
+						}
+						try {
+							Write-Status "Updating $updateName..." -ForegroundColor Yellow -Type Info -Important
+							Write-Log "Attempting to update $id."
+							$wingetArgs = @("upgrade", "--id", "$($id)")
+							if ($null -ne $packageOptions) {
+								$val = $packageOptions.$($id)
+								if ($null -ne $val) {
+									if ($val -is [array]) {
+										$wingetArgs += $val
+									}
+									else {
+										$wingetArgs += Split-ArgumentList $val
+									}
+								}
+							}
+							$wingetArgs += "--accept-source-agreements"
+							$wingetArgs += "--accept-package-agreements"
+
+							if ($Minimal) {
+								& winget @wingetArgs | Out-Null
+							}
+							else {
+								& winget @wingetArgs
+							}
+							if ($LASTEXITCODE -ne 0) {
+								throw "WinGet failed to update $updateName (ID: $id)"
+							}
+						}
+						catch {
+							$errorMessage = $_.Exception.Message
+							Write-Log "Error updating ${id}: $errorMessage"
+							Write-Status "  -> FAILED to update $updateName." -ForegroundColor Red -Type Error
+						}
+					}
+					"Always" {
+						if (-not $forcelist.Contains($id)) {
+							$forcelist.Add($id) | Out-Null
+						}
+						if ($whitelist.Contains($id)) {
+							$whitelist.Remove($id)
+						}
+						if ($blocklist.Contains($id)) {
+							$blocklist.Remove($id)
+						}
+						try {
+							Write-Status "Updating $updateName..." -ForegroundColor Yellow -Type Info -Important
+							Write-Log "Attempting to update $id (and adding to forcelist)."
+							$wingetArgs = @("upgrade", "--id", "$($id)")
+							if ($null -ne $packageOptions) {
+								$val = $packageOptions.$($id)
+								if ($null -ne $val) {
+									if ($val -is [array]) {
+										$wingetArgs += $val
+									}
+									else {
+										$wingetArgs += Split-ArgumentList $val
+									}
+								}
+							}
+							$wingetArgs += "--accept-source-agreements"
+							$wingetArgs += "--accept-package-agreements"
+
+							if ($Minimal) {
+								& winget @wingetArgs | Out-Null
+							}
+							else {
+								& winget @wingetArgs
+							}
+							if ($LASTEXITCODE -ne 0) {
+								throw "WinGet failed to update $updateName (ID: $id)"
+							}
+						}
+						catch {
+							$errorMessage = $_.Exception.Message
+							Write-Log "Error updating ${id}: $errorMessage"
+							Write-Status "  -> FAILED to update $updateName." -ForegroundColor Red -Type Error
+						}
+					}
+					"Skip" {
+						if ($whitelist.Contains($id)) {
+							$whitelist.Remove($id)
+						}
+					}
+					"Block" {
+						if (-not $blocklist.Contains($id)) {
+							$blocklist.Add($id) | Out-Null
+						}
+						if ($whitelist.Contains($id)) {
+							$whitelist.Remove($id)
+						}
+						if ($forcelist.Contains($id)) {
+							$forcelist.Remove($id)
+						}
+					}
+				}
+			}
+		}
+		else {
+			Write-Status "`nNo selections were made." -ForegroundColor Green -Type Info
+		}
 	}
-}
-catch {
-	Write-Status "Error loading update data." -Type Error
-	$allUpdates = @()
+
+	$dataToSave = @{
+		Whitelist = @($whitelist)
+		Blocklist = @($blocklist)
+		Forcelist = @($forcelist)
+		LastRun   = (Get-Date).ToString("o")
+	}
+	if ($null -ne $packageOptions -and $packageOptions.Count -gt 0) {
+		$dataToSave["PackageOptions"] = $packageOptions
+	}
+	Save-Data -DataToSave $dataToSave -FilePath $DataFile
+
+	Write-Status "`nUpdate complete." -Type Info -ForegroundColor Green -Important
+
+	$hasValidData = ($whitelist.Count + $blocklist.Count + $forcelist.Count) -gt 0
+
+	if (-not $Silent -and -not $Minimal -and $hasValidData) {
+		Invoke-Countdown -Seconds 5 `
+			-Message "Press 'E' to edit list, or Enter to exit (auto-exits in 5s)..." `
+			-Whitelist $whitelist -Blocklist $blocklist -Forcelist $forcelist -PackageOptions $packageOptions | Out-Null
+	}
+	elseif (-not $Silent -and -not $NoDelay -and -not $Minimal) {
+		Start-Sleep -Seconds 3
+	}
+
 }
 finally {
-	if ($CachePath -and (Test-Path $CachePath)) {
-		Remove-Item $CachePath -Force -ErrorAction SilentlyContinue
-	}
-}
-
-$updatesToForce = @(
-	$allUpdates | Where-Object {
-		$_.Id -and $forcelist -contains $_.Id
-	}
-)
-$blockedUpdates = @(
-	$allUpdates | Where-Object {
-		$_.Id -and $blocklist -contains $_.Id
-	}
-)
-$updatesToProcess = @(
-	$allUpdates | Where-Object {
-		$_.Id -and ($blocklist -notcontains $_.Id) -and ($forcelist -notcontains $_.Id)
-	}
-)
-
-if ($updatesToForce.Count -gt 0) {
-	Write-Status "--- Automatically updating packages from forcelist ---" -ForegroundColor Magenta -Type Info -Important
-	foreach ($update in $updatesToForce) {
-		Write-Status "Updating $($update.Name)..." -ForegroundColor Yellow -Type Info -Important
-		try {
-			$wingetArgs = @("upgrade", "--id", "$($update.Id)")
-			if ($null -ne $packageOptions) {
-				$val = $packageOptions.$($update.Id)
-				if ($null -ne $val) {
-					if ($val -is [array]) {
-						$wingetArgs += $val
-					}
-					else {
-						$wingetArgs += Split-ArgumentList $val
-					}
-				}
-			}
-			$wingetArgs += "--accept-source-agreements"
-			$wingetArgs += "--accept-package-agreements"
-
-			if ($Minimal) {
-				& winget @wingetArgs | Out-Null
-			}
-			else {
-				& winget @wingetArgs
-			}
-			if ($LASTEXITCODE -ne 0) {
-				throw "WinGet failed to update $($update.Name) (ID: $($update.Id))"
-			}
-		}
-		catch {
-			Write-Status "  -> FAILED to update $($update.Name)." -ForegroundColor Red -Type Error
-			Write-Log "Error updating $($update.Id): $($_.Exception.Message)"
-		}
-	}
-}
-
-if ($blockedUpdates.Count -gt 0) {
-	Write-Status "`n--- Skipping blocked packages ---" -ForegroundColor Red -Type Info
-	if (-not $Silent -and -not $Minimal) {
-		$blockedUpdates.Name | ForEach-Object {
-			Write-Host " - $_"
-		}
-	}
-}
-
-if ($updatesToProcess.Count -eq 0) {
-	Write-Log "No updates to process after filtering."
-	Write-Status "`nNo new updates to review." -Type Info -ForegroundColor Green
-}
-else {
-	$userChoices = Show-UpdateMenu -Updates $updatesToProcess -Whitelist $whitelist -PackageOptions $packageOptions
-
-	if ($userChoices.Count -gt 0) {
-		Write-Status "`n--- Processing Selections ---" -ForegroundColor Cyan -Type Info
-		foreach ($id in $userChoices.Keys) {
-			$choice = $userChoices[$id]
-			$update = $updatesToProcess | Where-Object {
-				$_.Id -eq $id
-			} | Select-Object -First 1
-			$updateName = if ($update) {
-				$update.Name
-			}
-			else {
-				$id
-			}
-
-			switch ($choice) {
-				"Run" {
-					if (-not $whitelist.Contains($id)) {
-						$whitelist.Add($id) | Out-Null
-					}
-					if ($blocklist.Contains($id)) {
-						$blocklist.Remove($id)
-					}
-					if ($forcelist.Contains($id)) {
-						$forcelist.Remove($id)
-					}
-					try {
-						Write-Status "Updating $updateName..." -ForegroundColor Yellow -Type Info -Important
-						Write-Log "Attempting to update $id."
-						$wingetArgs = @("upgrade", "--id", "$($id)")
-						if ($null -ne $packageOptions) {
-							$val = $packageOptions.$($id)
-							if ($null -ne $val) {
-								if ($val -is [array]) {
-									$wingetArgs += $val
-								}
-								else {
-									$wingetArgs += Split-ArgumentList $val
-								}
-							}
-						}
-						$wingetArgs += "--accept-source-agreements"
-						$wingetArgs += "--accept-package-agreements"
-
-						if ($Minimal) {
-							& winget @wingetArgs | Out-Null
-						}
-						else {
-							& winget @wingetArgs
-						}
-						if ($LASTEXITCODE -ne 0) {
-							throw "WinGet failed to update $updateName (ID: $id)"
-						}
-					}
-					catch {
-						$errorMessage = $_.Exception.Message
-						Write-Log "Error updating ${id}: $errorMessage"
-						Write-Status "  -> FAILED to update $updateName." -ForegroundColor Red -Type Error
-					}
-				}
-				"Always" {
-					if (-not $forcelist.Contains($id)) {
-						$forcelist.Add($id) | Out-Null
-					}
-					if ($whitelist.Contains($id)) {
-						$whitelist.Remove($id)
-					}
-					if ($blocklist.Contains($id)) {
-						$blocklist.Remove($id)
-					}
-					try {
-						Write-Status "Updating $updateName..." -ForegroundColor Yellow -Type Info -Important
-						Write-Log "Attempting to update $id (and adding to forcelist)."
-						$wingetArgs = @("upgrade", "--id", "$($id)")
-						if ($null -ne $packageOptions) {
-							$val = $packageOptions.$($id)
-							if ($null -ne $val) {
-								if ($val -is [array]) {
-									$wingetArgs += $val
-								}
-								else {
-									$wingetArgs += Split-ArgumentList $val
-								}
-							}
-						}
-						$wingetArgs += "--accept-source-agreements"
-						$wingetArgs += "--accept-package-agreements"
-
-						if ($Minimal) {
-							& winget @wingetArgs | Out-Null
-						}
-						else {
-							& winget @wingetArgs
-						}
-						if ($LASTEXITCODE -ne 0) {
-							throw "WinGet failed to update $updateName (ID: $id)"
-						}
-					}
-					catch {
-						$errorMessage = $_.Exception.Message
-						Write-Log "Error updating ${id}: $errorMessage"
-						Write-Status "  -> FAILED to update $updateName." -ForegroundColor Red -Type Error
-					}
-				}
-				"Skip" {
-					if ($whitelist.Contains($id)) {
-						$whitelist.Remove($id)
-					}
-				}
-				"Block" {
-					if (-not $blocklist.Contains($id)) {
-						$blocklist.Add($id) | Out-Null
-					}
-					if ($whitelist.Contains($id)) {
-						$whitelist.Remove($id)
-					}
-					if ($forcelist.Contains($id)) {
-						$forcelist.Remove($id)
-					}
-				}
-			}
-		}
-	}
-	else {
-		Write-Status "`nNo selections were made." -ForegroundColor Green -Type Info
-	}
-}
-
-$dataToSave = @{
-	Whitelist = @($whitelist)
-	Blocklist = @($blocklist)
-	Forcelist = @($forcelist)
-	LastRun   = (Get-Date).ToString("o")
-}
-if ($null -ne $packageOptions -and $packageOptions.Count -gt 0) {
-	$dataToSave["PackageOptions"] = $packageOptions
-}
-Save-Data -DataToSave $dataToSave -FilePath $DataFile
-
-Write-Status "`nUpdate complete." -Type Info -ForegroundColor Green -Important
-
-$hasValidData = ($whitelist.Count + $blocklist.Count + $forcelist.Count) -gt 0
-
-if (-not $Silent -and -not $Minimal -and $hasValidData) {
-	Invoke-Countdown -Seconds 5 `
-		-Message "Press 'E' to edit list, or Enter to exit (auto-exits in 5s)..." `
-		-Whitelist $whitelist -Blocklist $blocklist -Forcelist $forcelist -PackageOptions $packageOptions | Out-Null
-}
-elseif (-not $Silent -and -not $NoDelay -and -not $Minimal) {
-	Start-Sleep -Seconds 3
+	[System.Console]::remove_CancelKeyPress($controlCHandler)
+	Clear-Lock
 }
