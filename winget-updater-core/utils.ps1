@@ -22,7 +22,7 @@ Function Get-AppVersion {
 	else {
 		return "Unknown"
 	}
-	
+
 	try {
 		$versionLine = Get-Content $versionFilePath -ErrorAction Stop | Select-String '#define AppVersion' | Select-Object -First 1
 		if ($versionLine) {
@@ -157,11 +157,15 @@ Function Request-Lock {
 				if ([string]::IsNullOrWhiteSpace($lockContent)) {
 					throw "Lock file is empty."
 				}
-				$lockTime = [DateTime]::Parse($lockContent.Trim(), $null, [System.Globalization.DateTimeStyles]::RoundtripKind)
+				$lockTime = [DateTime]::Parse(
+					$lockContent.Trim(), 
+					[System.Globalization.CultureInfo]::InvariantCulture, 
+					[System.Globalization.DateTimeStyles]::RoundtripKind
+				)
 				if ((Get-Date) -lt $lockTime.AddHours(2)) {
 					if (-not $Silent) {
-						Write-Host "Warning: Another instance of WinGet Updater is already running (locked since $($lockTime.ToString('HH:mm:ss')))." -ForegroundColor Yellow
-						Write-Host "This usually happens if you've already opened the updater or if a previous instance crashed." -ForegroundColor Gray
+						Write-Host "Warning: Another instance of WinGet Updater may already be running (locked since $($lockTime.ToString('HH:mm:ss')))." -ForegroundColor Yellow
+						Write-Host "This usually happens if you have another instance of the updater open or if a previous instance exited abnormally." -ForegroundColor Gray
 						Write-Host ""
 						Write-Host "Do you want to start anyway? (y/N): " -NoNewline -ForegroundColor Yellow
 						$response = Read-Host
@@ -219,19 +223,22 @@ Function Find-OnlineUpdate {
 	try {
 		$apiUrl = "https://api.github.com/repos/$RepoOwner/$RepoName/releases/latest"
 		$response = Invoke-RestMethod -Uri $apiUrl -Method Get -TimeoutSec 3 -ErrorAction Stop
-		
+
 		if ($null -eq $response -or $null -eq $response.tag_name) {
 			return
 		}
 
 		$latestTag = $response.tag_name -replace "^v", ""
-		$latestTagClean = $response.tag_name -replace "^v", ""
-		if ($latestTagClean -notmatch "\.") { $latestTagClean += ".0" }
+		if ($latestTag -notmatch "\.") {
+			$latestTag += ".0"
+		}
 
 		$currentVerClean = $CurrentVersion -replace "^v", ""
-		if ($currentVerClean -notmatch "\.") { $currentVerClean += ".0" }
+		if ($currentVerClean -notmatch "\.") {
+			$currentVerClean += ".0"
+		}
 
-		if ([System.Version]$latestTagClean -gt [System.Version]$currentVerClean) {
+		if ([System.Version]$latestTag -gt [System.Version]$currentVerClean) {
 			Write-Status "`n[!] New version available: $($response.tag_name)" -ForegroundColor Yellow -Important
 			Write-Status "    Download at: $($response.html_url)" -ForegroundColor Cyan -Important
 			Write-Host ""
@@ -248,6 +255,7 @@ Function Find-OnlineUpdate {
 Function Get-WinGetUpdate {
 	Write-Status "Checking for available updates..." -Type Info -ForegroundColor Yellow
 	Write-Log "Checking for WinGet updates."
+
 	try {
 		Write-Log "Updating WinGet sources..."
 		Write-Status "Updating WinGet sources... (This may take a moment)" -Type Info -ForegroundColor Yellow
@@ -260,52 +268,62 @@ Function Get-WinGetUpdate {
 
 		Write-Log "Running 'winget upgrade' to find available updates."
 		Write-Status "Querying for available package updates..." -Type Info -ForegroundColor Yellow
+
 		[System.Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-		$wingetOutput = winget upgrade | Where-Object {
-			-not [string]::IsNullOrWhiteSpace($_)
-		}
+		$wingetOutput = winget upgrade --include-unknown | Out-String -Stream
 
 		$updates = @()
 
-		$headerLine = $wingetOutput | Where-Object {
-			$_ -like 'Name*Id*Version*'
-		} | Select-Object -First 1
 		$separatorLineIndex = -1
 		for ($i = 0; $i -lt $wingetOutput.Count; $i++) {
-			if ($wingetOutput[$i] -like '---*') {
+			if ($wingetOutput[$i] -match '^--+') {
 				$separatorLineIndex = $i
 				break
 			}
 		}
 
-		if (-not $headerLine -or $separatorLineIndex -eq -1) {
-			Write-Log "Could not find header or separator line in WinGet output. Assuming no updates."
+		if ($separatorLineIndex -le 0) {
+			Write-Log "No separator line found (or no header above it). Assuming no updates."
 			return @()
 		}
 
-		$idIndex = $headerLine.IndexOf('Id')
-		$versionIndex = $headerLine.IndexOf('Version')
-		$availableIndex = $headerLine.IndexOf('Available')
-		$sourceIndex = $headerLine.IndexOf('Source')
+		$headerLine = $wingetOutput[$separatorLineIndex - 1]
+
+		$columnStarts = @(0)
+		$gapRegex = [regex]'\s{2,}\S'
+		foreach ($match in $gapRegex.Matches($headerLine)) {
+			$columnStarts += ($match.Index + $match.Length - 1)
+		}
+
+		if ($columnStarts.Count -lt 4) {
+			Write-Log "Output format unexpected: not enough columns detected (found $($columnStarts.Count))."
+			return @()
+		}
+
+		$idStart = $columnStarts[1]
+		$verStart = $columnStarts[2]
+		$availStart = $columnStarts[3]
 
 		for ($i = $separatorLineIndex + 1; $i -lt $wingetOutput.Count; $i++) {
 			$line = $wingetOutput[$i]
-			if ($line.Length -lt $sourceIndex -or $line -like '*upgrades available*' -or $line -like '*cannot be determined*') {
+
+			if ([string]::IsNullOrWhiteSpace($line) -or $line.Length -lt $availStart) {
 				continue
 			}
 
 			try {
-				$name = $line.Substring(0, $idIndex).Trim()
-				$id = ($line.Substring($idIndex, $versionIndex - $idIndex).Trim() -replace '\p{C}')
-				$version = $line.Substring($versionIndex, $availableIndex - $versionIndex).Trim()
-				$available = $line.Substring($availableIndex, $sourceIndex - $availableIndex).Trim()
+				$name = $line.Substring(0, $idStart).Trim()
+				$id = ($line.Substring($idStart, ($verStart - $idStart)).Trim() -replace '\p{C}')
+				$currentVer = $line.Substring($verStart, ($availStart - $verStart)).Trim()
 
-				if (-not ([string]::IsNullOrWhiteSpace($id))) {
+				$availableVer = $line.Substring($availStart).Trim().Split(" ")[0]
+
+				if (-not [string]::IsNullOrWhiteSpace($id)) {
 					$updates += [PSCustomObject]@{
 						Name             = $name
 						Id               = $id
-						Version          = $version
-						AvailableVersion	= $available
+						Version          = $currentVer
+						AvailableVersion = $availableVer
 					}
 				}
 			}
