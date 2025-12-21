@@ -154,7 +154,7 @@ Function Request-Lock {
 	)
 
 	if (Test-Path $LockFile) {
-		if (-not $Forced) {
+		if (-not $Forced -and -not $Unattended) {
 			try {
 				$lockContent = Get-Content $LockFile -Raw -ErrorAction Stop
 				if ([string]::IsNullOrWhiteSpace($lockContent)) {
@@ -217,6 +217,10 @@ Function Clear-Lock {
 
 
 Function Find-OnlineUpdate {
+	if ($Unattended) {
+		return
+	}
+
 	param(
 		[string]$CurrentVersion,
 		[string]$RepoOwner = "ELowry",
@@ -371,6 +375,10 @@ Function Get-WinGetUpdate {
 }
 
 Function Repair-RegistryVersionError {
+	if ($Unattended) {
+		return
+	}
+
 	$isElevated = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 	$foundIssues = $false
 
