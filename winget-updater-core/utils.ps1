@@ -8,6 +8,8 @@
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSUseDeclaredVarsMoreThanAssignments", "")]
 param()
 
+$EntryScriptPath = $MyInvocation.PSCommandPath
+
 $DataFile = Join-Path $PSScriptRoot "winget-updater-data.json"
 $LogFile = Join-Path $PSScriptRoot "winget-updater-log.txt"
 $LockFile = Join-Path $PSScriptRoot "winget-updater.lock"
@@ -229,16 +231,38 @@ Function Find-OnlineUpdate {
 		}
 
 		$latestTag = $response.tag_name -replace "^v", ""
-		if ($latestTag -notmatch "\.") {
-			$latestTag += ".0"
+		$latestNumeric = $latestTag -replace '[^0-9.].*$', ''
+		$latestSuffix = $latestTag.Substring($latestNumeric.Length)
+		if ($latestNumeric -notmatch "\.") {
+			$latestNumeric += ".0"
 		}
 
 		$currentVerClean = $CurrentVersion -replace "^v", ""
-		if ($currentVerClean -notmatch "\.") {
-			$currentVerClean += ".0"
+		$currentNumeric = $currentVerClean -replace '[^0-9.].*$', ''
+		$currentSuffix = $currentVerClean.Substring($currentNumeric.Length)
+		if ($currentNumeric -notmatch "\.") {
+			$currentNumeric += ".0"
 		}
 
-		if ([System.Version]$latestTag -gt [System.Version]$currentVerClean) {
+		$isNewer = $false
+		try {
+			$vLatest = [System.Version]$latestNumeric
+			$vCurrent = [System.Version]$currentNumeric
+
+			if ($vLatest -gt $vCurrent) {
+				$isNewer = $true
+			}
+			elseif ($vLatest -eq $vCurrent -and $latestSuffix -gt $currentSuffix) {
+				$isNewer = $true
+			}
+		}
+		catch {
+			if ($latestTag -gt $currentVerClean) {
+				$isNewer = $true
+			}
+		}
+
+		if ($isNewer) {
 			Write-Status "`n[!] New version available: $($response.tag_name)" -ForegroundColor Yellow -Important
 			Write-Status "    Download at: $($response.html_url)" -ForegroundColor Cyan -Important
 			Write-Host ""
@@ -253,6 +277,8 @@ Function Find-OnlineUpdate {
 }
 
 Function Get-WinGetUpdate {
+	Repair-RegistryVersionErrors
+
 	Write-Status "Checking for available updates..." -Type Info -ForegroundColor Yellow
 	Write-Log "Checking for WinGet updates."
 
@@ -340,5 +366,107 @@ Function Get-WinGetUpdate {
 		Write-Log "Error getting WinGet updates: $errorMessage"
 		Write-Status "An error occurred while fetching updates. Check the log file for details." -ForegroundColor Red -Type Error
 		return @()
+	}
+}
+
+Function Repair-RegistryVersionErrors {
+	$isElevated = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+	$foundIssues = $false
+
+	$paths = @(
+		"HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
+		"HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall",
+		"HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall"
+	)
+
+	foreach ($rootPath in $paths) {
+		if (Test-Path $rootPath) {
+			Get-ChildItem -Path $rootPath | ForEach-Object {
+				$keyPath = $_.PSPath
+				try {
+					$props = Get-ItemProperty -Path $keyPath -ErrorAction SilentlyContinue
+					if (-not [string]::IsNullOrWhiteSpace($props.DisplayVersion)) {
+						return
+					}
+					$candidateVersion = $null
+					if (-not [string]::IsNullOrWhiteSpace($props.Version)) {
+						$candidateVersion = $props.Version
+					}
+					elseif (-not [string]::IsNullOrWhiteSpace($props.'Inno Setup: Setup Version')) {
+						$candidateVersion = $props.'Inno Setup: Setup Version'
+					}
+
+					if ($candidateVersion) {
+						$isUserScope = $keyPath -match "HKEY_CURRENT_USER" -or $rootPath -like "HKCU*"
+						$canWrite = $isElevated -or $isUserScope
+
+						if ($canWrite) {
+							try {
+								Set-ItemProperty -Path $keyPath -Name "DisplayVersion" -Value $candidateVersion -ErrorAction Stop
+
+								$name = if ($props.DisplayName) { $props.DisplayName } else { $_.PSChildName }
+								Write-Log "Repaired registry: Set 'DisplayVersion' to '$candidateVersion' for '$name'."
+								Write-Status "Fixed missing version for '$name'" -Type Info -ForegroundColor Cyan
+							}
+							catch {
+								Write-Log "Could not patch registry for $($_.PSChildName): $($_.Exception.Message)"
+								if (-not $isUserScope) { $foundIssues = $true }
+							}
+						}
+						else {
+							$foundIssues = $true
+						}
+					}
+				}
+				catch {
+					Write-Log "Failed to repair registry for $($_.PSChildName): $($_.Exception.Message)"
+				}
+			}
+		}
+	}
+
+	if (-not $isElevated -and $foundIssues -and -not $Silent) {
+		Write-Status "`n[!] Some installed apps have missing version information in the registry." -ForegroundColor Yellow -Important
+		Write-Status "    This prevents WinGet from correctly identifying updates for them.`n" -ForegroundColor Yellow -Important
+
+		Write-Host "Do you want to relaunch as Administrator to fix this automatically? (y/N): " -NoNewline -ForegroundColor Yellow
+		$response = Read-Host
+		if ($response.ToLower() -eq 'y') {
+			$mainScript = $EntryScriptPath 
+
+			$params = @()
+			$possibleParams = @("NoClear", "Silent", "Minimal", "NoDelay", "Forced", "CachePath")
+			foreach ($p in $possibleParams) {
+				$v = Get-Variable -Name $p -ErrorAction SilentlyContinue
+				if ($v) {
+					if ($v.Value -is [switch] -and $v.Value) {
+						$params += "-$p"
+					}
+					elseif ($v.Value -and $v.Value -isnot [switch]) {
+						$val = $v.Value
+						$val = $val -replace '"', '\"'
+						$params += "-$p", "`"$val`""
+					}
+				}
+			}
+			$argString = $params -join ' '
+
+			$psCmd = "-NoProfile -ExecutionPolicy Bypass -File `"$mainScript`" $argString"
+
+			Write-Host "Relaunching: powershell.exe $psCmd" -ForegroundColor DarkGray
+
+			if (Get-Command wt.exe -ErrorAction SilentlyContinue) {
+				Start-Process "wt.exe" -Verb RunAs -ArgumentList "-w new powershell.exe $psCmd"
+				exit
+			}
+			Start-Process "powershell.exe" -Verb RunAs -ArgumentList $psCmd
+			exit
+		}
+
+		if (-not $Minimal) {
+			Write-Host "Press Enter to continue without repairing..." -NoNewline -ForegroundColor Gray
+			$null = Read-Host
+			Write-Host ""
+		}
 	}
 }
