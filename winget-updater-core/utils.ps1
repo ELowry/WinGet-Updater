@@ -6,9 +6,9 @@
 #>
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSAvoidUsingWriteHost", "")]
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSUseDeclaredVarsMoreThanAssignments", "")]
-param()
-
-$EntryScriptPath = $MyInvocation.PSCommandPath
+param(
+	[string]$EntryScriptPath
+)
 
 $DataFile = Join-Path $PSScriptRoot "winget-updater-data.json"
 $LogFile = Join-Path $PSScriptRoot "winget-updater-log.txt"
@@ -277,7 +277,7 @@ Function Find-OnlineUpdate {
 }
 
 Function Get-WinGetUpdate {
-	Repair-RegistryVersionErrors
+	Repair-RegistryVersionError
 
 	Write-Status "Checking for available updates..." -Type Info -ForegroundColor Yellow
 	Write-Log "Checking for WinGet updates."
@@ -369,7 +369,7 @@ Function Get-WinGetUpdate {
 	}
 }
 
-Function Repair-RegistryVersionErrors {
+Function Repair-RegistryVersionError {
 	$isElevated = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 	$foundIssues = $false
 
@@ -461,12 +461,6 @@ Function Repair-RegistryVersionErrors {
 			}
 			Start-Process "powershell.exe" -Verb RunAs -ArgumentList $psCmd
 			exit
-		}
-
-		if (-not $Minimal) {
-			Write-Host "Press Enter to continue without repairing..." -NoNewline -ForegroundColor Gray
-			$null = Read-Host
-			Write-Host ""
 		}
 	}
 }

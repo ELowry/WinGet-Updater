@@ -6,7 +6,7 @@
 #>
 param()
 
-. "$PSScriptRoot\utils.ps1"
+. "$PSScriptRoot\utils.ps1" -EntryScriptPath $PSCommandPath
 
 $data = $null
 if (Test-Path $DataFile) {

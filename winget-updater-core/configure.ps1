@@ -48,7 +48,7 @@ function Set-ConfigValue {
 }
 
 try {
-	. "$PSScriptRoot\utils.ps1"
+	. "$PSScriptRoot\utils.ps1" -EntryScriptPath $PSCommandPath
 	$AppName = "Winget Updater"
 	$AppVersion = Get-AppVersion
 

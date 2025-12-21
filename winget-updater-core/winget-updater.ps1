@@ -16,7 +16,7 @@ param(
 	[string]$CachePath
 )
 
-. "$PSScriptRoot\utils.ps1"
+. "$PSScriptRoot\utils.ps1" -EntryScriptPath $PSCommandPath
 
 $AppVersion = Get-AppVersion
 
