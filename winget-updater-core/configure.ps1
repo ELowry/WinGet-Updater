@@ -101,6 +101,7 @@ try {
 	Copy-Item -Path "$SourceDir\uninstall.ps1" -Destination $InstallDir -Force
 	Copy-Item -Path "$SourceDir\launcher.bat" -Destination $InstallDir -Force
 	Copy-Item -Path "$SourceDir\silent.vbs" -Destination $InstallDir -Force
+	Copy-Item -Path "$SourceDir\winget-updater.ico" -Destination $InstallDir -Force
 
 	Write-Host "Setting up shortcuts..." -ForegroundColor Yellow
 	$StartMenuPrograms = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs"
@@ -111,7 +112,7 @@ try {
 	$Shortcut = $WshShell.CreateShortcut($LinkPath)
 	$Shortcut.TargetPath = "cmd.exe"
 	$Shortcut.Arguments = "/c start `"`" /min `"$InstallDir\launcher.bat`""
-	$Shortcut.IconLocation = "shell32.dll,238"
+	$Shortcut.IconLocation = "$InstallDir\winget-updater.ico"
 	$Shortcut.Description = "Update Windows applications using WinGet"
 	$Shortcut.WorkingDirectory = $InstallDir
 	$Shortcut.Save()
@@ -126,7 +127,7 @@ try {
 		"DisplayVersion"  = $AppVersion
 		"Publisher"       = "Eric Lowry"
 		"UninstallString" = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$InstallDir\uninstall.ps1`""
-		"DisplayIcon"     = "shell32.dll,238"
+		"DisplayIcon"     = "$InstallDir\winget-updater.ico"
 		"InstallLocation" = $InstallDir
 		"NoModify"        = 1
 		"NoRepair"        = 1
