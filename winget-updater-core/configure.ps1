@@ -102,6 +102,12 @@ try {
 	Copy-Item -Path "$SourceDir\launcher.bat" -Destination $InstallDir -Force
 	Copy-Item -Path "$SourceDir\silent.vbs" -Destination $InstallDir -Force
 	Copy-Item -Path "$SourceDir\winget-updater.ico" -Destination $InstallDir -Force
+	if (Test-Path "$SourceDir\version.isi") {
+		Copy-Item -Path "$SourceDir\version.isi" -Destination $InstallDir -Force
+	}
+	elseif (Test-Path "$SourceDir\..\installer\version.isi") {
+		Copy-Item -Path "$SourceDir\..\installer\version.isi" -Destination "$InstallDir\version.isi" -Force
+	}
 
 	Write-Host "Setting up shortcuts..." -ForegroundColor Yellow
 	$StartMenuPrograms = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs"
