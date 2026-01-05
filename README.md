@@ -59,8 +59,20 @@ For power users who prefer the terminal, after installation you can run:
 
 - `-Minimal`: Shows only the most important status messages.
   - _Enabled by default during scheduled runs._
-- `-Silent`: Runs without any popups unless the script encounters unknown apps.
+- `-Silent`: Runs without any popups. Skips interactive menu. Only runs forced updates.
 - `-NoClear`: Prevents clearing the console when the script starts.
+
+### Silent Maintenance Mode
+
+For users who want zero interruptions, or for maintainers setting up devices for others, you can enable **Silent Mode** during installation (or re-configuration).
+
+In this mode:
+- The automatic check runs completely silently in the background.
+- It **only** updates applications you have explicitly marked as "**[A]lways run**".
+- All other updates are ignored until you run Winget Updater manually.
+
+   > [!TIP]
+This is ideal for "kiosk" style setups or for family members who shouldn't be bothered with update decisions. The maintainer can simply run the updater manually once in a while to approve new updates and add them to the "Always run" list.
 
 ### Customizing Update Options
 

@@ -515,7 +515,10 @@ try {
 		Write-Status "`nNo new updates to review." -Type Info -ForegroundColor Green
 	}
 	else {
-		$userChoices = Show-UpdateMenu -Updates $updatesToProcess -Whitelist $whitelist -PackageOptions $packageOptions
+		$userChoices = @{}
+		if (-not $Silent) {
+			$userChoices = Show-UpdateMenu -Updates $updatesToProcess -Whitelist $whitelist -PackageOptions $packageOptions
+		}
 
 		if ($userChoices.Count -gt 0) {
 			Write-Status "`n--- Processing Selections ---" -ForegroundColor Cyan -Type Info

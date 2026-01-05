@@ -4,7 +4,9 @@
 	Copyright 2025 Eric Lowry
 	Licensed under the MIT License.
 #>
-param()
+param(
+	[switch]$Silent
+)
 
 . "$PSScriptRoot\utils.ps1" -EntryScriptPath $PSCommandPath
 
@@ -75,13 +77,19 @@ try {
 	$tempCache = [System.IO.Path]::GetTempFileName()
 	$updates | ConvertTo-Json -Depth 5 | Out-File -FilePath $tempCache -Encoding utf8
 
-	Write-Log "Scheduled check found $($actionableUpdates.Count) actionable updates. Launching UI."
-
-	if (Get-Command wt.exe -ErrorAction SilentlyContinue) {
-		Start-Process "wt.exe" -ArgumentList "-w new powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$PSScriptRoot\winget-updater.ps1`" -Minimal -Forced -CachePath `"$tempCache`"" -WindowStyle Normal
+	if ($Silent) {
+		Write-Log "Scheduled check found $($actionableUpdates.Count) actionable updates. Launching in Silent Mode."
+		Start-Process "powershell.exe" -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSScriptRoot\winget-updater.ps1`" -Minimal -Forced -Silent -CachePath `"$tempCache`"" -WindowStyle Hidden
 	}
 	else {
-		Start-Process "powershell.exe" -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSScriptRoot\winget-updater.ps1`" -Minimal -Forced -CachePath `"$tempCache`"" -WindowStyle Normal
+		Write-Log "Scheduled check found $($actionableUpdates.Count) actionable updates. Launching UI."
+
+		if (Get-Command wt.exe -ErrorAction SilentlyContinue) {
+			Start-Process "wt.exe" -ArgumentList "-w new powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$PSScriptRoot\winget-updater.ps1`" -Minimal -Forced -CachePath `"$tempCache`"" -WindowStyle Normal
+		}
+		else {
+			Start-Process "powershell.exe" -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSScriptRoot\winget-updater.ps1`" -Minimal -Forced -CachePath `"$tempCache`"" -WindowStyle Normal
+		}
 	}
 
 }

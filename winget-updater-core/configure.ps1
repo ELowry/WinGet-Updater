@@ -10,6 +10,7 @@ param(
 	[switch]$Unattended,
 	[switch]$EnableStartup,
 	[switch]$EnableWake,
+	[switch]$InstallOnly,
 	[switch]$Forced
 )
 
@@ -149,6 +150,7 @@ try {
 
 	$PrevStartup = Get-ConfigValue -Name "AutoStartup" -Default 1
 	$PrevWake = Get-ConfigValue -Name "AutoWake" -Default 0
+	$PrevInstallOnly = Get-ConfigValue -Name "AutoInstallOnly" -Default 0
 
 	$StartupDefault = if ($PrevStartup -eq 1) {
 		"Y"
@@ -157,6 +159,12 @@ try {
 		"n"
 	}
 	$WakeDefault = if ($PrevWake -eq 1) {
+		"Y"
+	}
+	else {
+		"n"
+	}
+	$InstallOnlyDefault = if ($PrevInstallOnly -eq 1) {
 		"Y"
 	}
 	else {
@@ -221,6 +229,35 @@ try {
 		}
 	}
 
+	if ($Unattended) {
+		$RunInstallOnly = if ($InstallOnly) {
+			"y"
+		}
+		else {
+			"n"
+		}
+	}
+	else {
+		$prompt = "Silent Mode (Only install [A]lways updates automatically)? ($(
+			if ($InstallOnlyDefault -eq 'Y') {
+				'Y/n'
+			}
+			else {
+				'y/N'
+			}
+		)): "
+		Write-Host $prompt -NoNewline -ForegroundColor Yellow
+		$RunInstallOnly = Read-Host
+	}
+	if ([string]::IsNullOrWhiteSpace($RunInstallOnly)) {
+		$RunInstallOnly = if ($InstallOnlyDefault -eq "Y") {
+			"y"
+		}
+		else {
+			"n"
+		}
+	}
+
 	$TaskName = "Winget Updater"
 	Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
 
@@ -250,6 +287,9 @@ try {
 	$SafeTarget = $TargetScript.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("`"", "&quot;")
 
 	$ArgString = "`"$SafeVbs`" `"$SafeTarget`""
+	if ($RunInstallOnly -eq "y") {
+		$ArgString += " -Silent"
+	}
 	$User = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
 
 	$TaskXml = @"
@@ -319,9 +359,16 @@ $Values_Triggers
 		else {
 			0
 		}
+		$installOnlyValue = if ($RunInstallOnly -eq "y") {
+			1
+		}
+		else {
+			0
+		}
 
 		Set-ConfigValue -Name "AutoStartup" -Value $startupValue
 		Set-ConfigValue -Name "AutoWake" -Value $wakeValue
+		Set-ConfigValue -Name "AutoInstallOnly" -Value $installOnlyValue
 		Set-ConfigValue -Name "InstalledVersion" -Value $AppVersion
 		Write-Host " -> Configuration saved." -ForegroundColor Green
 	}
