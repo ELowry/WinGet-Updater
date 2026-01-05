@@ -73,7 +73,7 @@ In this mode:
 - All other updates are ignored until you run Winget Updater manually.
 
 > [!TIP]
-> This is ideal when setting upa computer for which the user(s) shouldn't be bothered with update decisions. The maintainer can simply run the updater manually once in a while to approve new updates and add them to the "Always run" list.
+> This is ideal when setting up a computer for which the user(s) shouldn't be bothered with update decisions. The maintainer can simply run the updater manually once in a while to approve new updates and add them to the "Always run" list.
 
 ### Customizing Update Options
 
