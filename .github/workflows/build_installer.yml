@@ -15,15 +15,15 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v6.0.1
+        uses: actions/checkout@v6
 
       - name: Run Markdown Lint
-        uses: DavidAnson/markdownlint-cli2-action@v22.0.0
+        uses: DavidAnson/markdownlint-cli2-action@v22
         with:
           globs: '**/*.md'
 
       - name: Run PSScriptAnalyzer
-        shell: powershell
+        shell: pwsh
         run: |
           $results = Invoke-ScriptAnalyzer -Path ".\winget-updater-core" -Recurse -Severity Error,Warning
           if ($results) {
@@ -32,6 +32,29 @@ jobs:
           }
           Write-Host "PSScriptAnalyzer passed successfully."
 
+      - name: Verify Version Integrity
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        run: |
+          $ref = '${{ github.ref }}'
+          $tag = $ref -replace '^refs/tags/v?',''
+          Write-Host "Git Tag Version: $tag"
+
+          $content = Get-Content installer/version.isi -Raw
+          if ($content -match '#define\s+AppVersion\s+"([^"]+)"') {
+            $isi = $matches[1]
+          } else {
+            Write-Error "Could not parse AppVersion from installer/version.isi"
+            exit 1
+          }
+          Write-Host "version.isi AppVersion: $isi"
+
+          if ($tag -ne $isi) {
+            Write-Error "Version mismatch! Git tag ($tag) does not match installer/version.isi ($isi)."
+            exit 1
+          }
+          Write-Host "Versions match. Proceeding with release."
+
   build:
     name: Build Installer and Create Release
     needs: verify
@@ -39,10 +62,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6.0.1
+        uses: actions/checkout@v6
 
       - name: Compile Inno Setup Script
-        uses: Minionguyjpro/Inno-Setup-Action@v1.2.7
+        uses: Minionguyjpro/Inno-Setup-Action@v1
         with:
           path: installer/setup.iss
 
@@ -51,12 +74,38 @@ jobs:
         run: |
           Compress-Archive -Path install-winget-updater.bat, winget-updater-core, installer/version.isi -DestinationPath WinGet-Updater.zip
 
+      - name: Verify Artifacts Exist
+        shell: pwsh
+        run: |
+          $expectedFiles = @(
+            "installer/Output/WingetUpdaterSetup.exe",
+            "WinGet-Updater.zip"
+          )
+          foreach ($file in $expectedFiles) {
+            if (-not (Test-Path $file)) {
+              Write-Error "Critical artifact missing: $file"
+              exit 1
+              exit 1
+            }
+            Write-Host "Verified artifact: $file"
+          }
+
+      - name: Generate SHA256 Checksums
+        shell: pwsh
+        run: |
+          $files = Get-ChildItem -Path "installer/Output/WingetUpdaterSetup.exe", "WinGet-Updater.zip"
+          $files | Get-FileHash -Algorithm SHA256 | Select-Object Hash, Path | ForEach-Object {
+            "$($_.Hash)  $($_.Path | Split-Path -Leaf)"
+          } | Out-File -FilePath "checksums.txt" -Encoding utf8
+          Write-Host "Checksums generated in checksums.txt"
+
       - name: Create Draft Release
         if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2.5.0
+        uses: softprops/action-gh-release@v2
         with:
           files: |
             installer/Output/WingetUpdaterSetup.exe
             WinGet-Updater.zip
+            checksums.txt
           draft: true
           generate_release_notes: true
