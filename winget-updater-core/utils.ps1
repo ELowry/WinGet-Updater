@@ -275,7 +275,7 @@ Function Find-OnlineUpdate {
 
 				if ($installerAsset) {
 					$downloadUrl = $installerAsset.browser_download_url
-					$tempInstaller = Join-Path [System.IO.Path]::GetTempPath() $installerAsset.name
+					$tempInstaller = Join-Path ([System.IO.Path]::GetTempPath()) $installerAsset.name
 
 					Invoke-WebRequest -Uri $downloadUrl -OutFile $tempInstaller -UseBasicParsing
 
