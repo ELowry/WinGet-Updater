@@ -58,7 +58,7 @@ Function Get-LastRunDate {
 		return [DateTime]::MinValue
 	}
 	catch {
-		Write-Log "Could not parse LastRun date: '$($Data.LastRun)'. Error: $($_.Exception.Message)"
+		Write-UpdaterLog "Could not parse LastRun date: '$($Data.LastRun)'. Error: $($_.Exception.Message)"
 		return [DateTime]::MinValue
 	}
 }
@@ -91,7 +91,7 @@ Function Write-Status {
 	}
 }
 
-Function Write-Log {
+Function Write-UpdaterLog {
 	param(
 		[string]$Message
 	)
@@ -117,7 +117,7 @@ Function Save-Data {
 		Write-Status "Data saved successfully." -Type Info -ForegroundColor Green
 	}
 	catch {
-		Write-Log "Failed to save data: $($_.Exception.Message)"
+		Write-UpdaterLog "Failed to save data: $($_.Exception.Message)"
 		Write-Status "Error saving data file." -ForegroundColor Red -Type Error
 	}
 	finally {
@@ -173,7 +173,7 @@ Function Request-Lock {
 						Write-Host "Do you want to start anyway? (y/N): " -NoNewline -ForegroundColor Yellow
 						$response = Read-Host
 						if ($response -eq 'y') {
-							Write-Log "Lock override bypassed via user prompt."
+							Write-UpdaterLog "Lock override bypassed via user prompt."
 						}
 						else {
 							return $false
@@ -189,13 +189,13 @@ Function Request-Lock {
 
 			}
 			catch {
-				Write-Log "Error checking lock file: $($_.Exception.Message)"
+				Write-UpdaterLog "Error checking lock file: $($_.Exception.Message)"
 				Write-Status "Error checking lock file: $($_.Exception.Message)" -ForegroundColor Red -Type Error
 				return $false # Fail safe: if we can't check the lock, assume it's locked
 			}
 		}
 		else {
-			Write-Log "Lock override forced."
+			Write-UpdaterLog "Lock override forced."
 		}
 	}
 
@@ -204,7 +204,7 @@ Function Request-Lock {
 		return $true
 	}
 	catch {
-		Write-Log "Failed to create lock file: $($_.Exception.Message)"
+		Write-UpdaterLog "Failed to create lock file: $($_.Exception.Message)"
 		return $false
 	}
 }
@@ -294,14 +294,14 @@ Function Find-OnlineUpdate {
 				}
 			}
 			catch {
-				Write-Log "Failed to download or execute the self-update: $($_.Exception.Message)"
+				Write-UpdaterLog "Failed to download or execute the self-update: $($_.Exception.Message)"
 				Write-Status "Self-update failed. Please update manually at: $($response.html_url)" -ForegroundColor Red -Important
 				Start-Sleep -Seconds 3
 			}
 		}
 	}
 	catch {
-		Write-Log "Failed to check for updates: $($_.Exception.Message)"
+		Write-UpdaterLog "Failed to check for updates: $($_.Exception.Message)"
 	}
 }
 
@@ -309,19 +309,19 @@ Function Get-WinGetUpdate {
 	Repair-RegistryVersionError
 
 	Write-Status "Checking for available updates..." -Type Info -ForegroundColor Yellow
-	Write-Log "Checking for WinGet updates."
+	Write-UpdaterLog "Checking for WinGet updates."
 
 	try {
-		Write-Log "Updating WinGet sources..."
+		Write-UpdaterLog "Updating WinGet sources..."
 		Write-Status "Updating WinGet sources... (This may take a moment)" -Type Info -ForegroundColor Yellow
 
 		$proc = Start-Process winget -ArgumentList "source update" -NoNewWindow -PassThru -Wait
 		if ($proc.ExitCode -ne 0) {
-			Write-Log "WinGet source update returned exit code $($proc.ExitCode)."
+			Write-UpdaterLog "WinGet source update returned exit code $($proc.ExitCode)."
 		}
-		Write-Log "WinGet sources updated."
+		Write-UpdaterLog "WinGet sources updated."
 
-		Write-Log "Running 'winget upgrade' to find available updates."
+		Write-UpdaterLog "Running 'winget upgrade' to find available updates."
 		Write-Status "Querying for available package updates..." -Type Info -ForegroundColor Yellow
 
 		[System.Console]::OutputEncoding = [System.Text.Encoding]::UTF8
@@ -338,7 +338,7 @@ Function Get-WinGetUpdate {
 		}
 
 		if ($separatorLineIndex -le 0) {
-			Write-Log "No separator line found (or no header above it). Assuming no updates."
+			Write-UpdaterLog "No separator line found (or no header above it). Assuming no updates."
 			return @()
 		}
 
@@ -351,7 +351,7 @@ Function Get-WinGetUpdate {
 		}
 
 		if ($columnStarts.Count -lt 4) {
-			Write-Log "Output format unexpected: not enough columns detected (found $($columnStarts.Count))."
+			Write-UpdaterLog "Output format unexpected: not enough columns detected (found $($columnStarts.Count))."
 			return @()
 		}
 
@@ -383,16 +383,16 @@ Function Get-WinGetUpdate {
 				}
 			}
 			catch {
-				Write-Log "Failed to parse line: '$line'. Error: $($_.Exception.Message)"
+				Write-UpdaterLog "Failed to parse line: '$line'. Error: $($_.Exception.Message)"
 			}
 		}
 
-		Write-Log "Found $($updates.Count) valid updates."
+		Write-UpdaterLog "Found $($updates.Count) valid updates."
 		return $updates
 	}
 	catch {
 		$errorMessage = $_.Exception.Message
-		Write-Log "Error getting WinGet updates: $errorMessage"
+		Write-UpdaterLog "Error getting WinGet updates: $errorMessage"
 		Write-Status "An error occurred while fetching updates. Check the log file for details." -ForegroundColor Red -Type Error
 		return @()
 	}
@@ -438,11 +438,11 @@ Function Repair-RegistryVersionError {
 								Set-ItemProperty -Path $keyPath -Name "DisplayVersion" -Value $candidateVersion -ErrorAction Stop
 
 								$name = if ($props.DisplayName) { $props.DisplayName } else { $_.PSChildName }
-								Write-Log "Repaired registry: Set 'DisplayVersion' to '$candidateVersion' for '$name'."
+								Write-UpdaterLog "Repaired registry: Set 'DisplayVersion' to '$candidateVersion' for '$name'."
 								Write-Status "Fixed missing version for '$name'" -Type Info -ForegroundColor Cyan
 							}
 							catch {
-								Write-Log "Could not patch registry for $($_.PSChildName): $($_.Exception.Message)"
+								Write-UpdaterLog "Could not patch registry for $($_.PSChildName): $($_.Exception.Message)"
 								if (-not $isUserScope) { $foundIssues = $true }
 							}
 						}
@@ -452,7 +452,7 @@ Function Repair-RegistryVersionError {
 					}
 				}
 				catch {
-					Write-Log "Failed to repair registry for $($_.PSChildName): $($_.Exception.Message)"
+					Write-UpdaterLog "Failed to repair registry for $($_.PSChildName): $($_.Exception.Message)"
 				}
 			}
 		}

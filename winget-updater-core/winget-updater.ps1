@@ -357,7 +357,7 @@ if (Test-Path $DataFile) {
 	}
 	catch {
 		$err = $_.Exception.Message
-		Write-Log "Error reading or parsing data file $DataFile. A new one will be created. Error: $err"
+		Write-UpdaterLog "Error reading or parsing data file $DataFile. A new one will be created. Error: $err"
 		$data = $null
 	}
 }
@@ -496,7 +496,7 @@ try {
 			}
 			catch {
 				Write-Status "  -> FAILED to update $($update.Name)." -ForegroundColor Red -Type Error
-				Write-Log "Error updating $($update.Id): $($_.Exception.Message)"
+				Write-UpdaterLog "Error updating $($update.Id): $($_.Exception.Message)"
 			}
 		}
 	}
@@ -511,7 +511,7 @@ try {
 	}
 
 	if ($updatesToProcess.Count -eq 0) {
-		Write-Log "No updates to process after filtering."
+		Write-UpdaterLog "No updates to process after filtering."
 		Write-Status "`nNo new updates to review." -Type Info -ForegroundColor Green
 	}
 	else {
@@ -547,7 +547,7 @@ try {
 						}
 						try {
 							Write-Status "Updating $updateName..." -ForegroundColor Yellow -Type Info -Important
-							Write-Log "Attempting to update $id."
+							Write-UpdaterLog "Attempting to update $id."
 							$wingetArgs = @("upgrade", "--id", "$($id)")
 							if ($null -ne $packageOptions) {
 								$val = $packageOptions.$($id)
@@ -575,7 +575,7 @@ try {
 						}
 						catch {
 							$errorMessage = $_.Exception.Message
-							Write-Log "Error updating ${id}: $errorMessage"
+							Write-UpdaterLog "Error updating ${id}: $errorMessage"
 							Write-Status "  -> FAILED to update $updateName." -ForegroundColor Red -Type Error
 						}
 					}
@@ -591,7 +591,7 @@ try {
 						}
 						try {
 							Write-Status "Updating $updateName..." -ForegroundColor Yellow -Type Info -Important
-							Write-Log "Attempting to update $id (and adding to forcelist)."
+							Write-UpdaterLog "Attempting to update $id (and adding to forcelist)."
 							$wingetArgs = @("upgrade", "--id", "$($id)")
 							if ($null -ne $packageOptions) {
 								$val = $packageOptions.$($id)
@@ -619,7 +619,7 @@ try {
 						}
 						catch {
 							$errorMessage = $_.Exception.Message
-							Write-Log "Error updating ${id}: $errorMessage"
+							Write-UpdaterLog "Error updating ${id}: $errorMessage"
 							Write-Status "  -> FAILED to update $updateName." -ForegroundColor Red -Type Error
 						}
 					}
