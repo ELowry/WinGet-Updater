@@ -268,12 +268,36 @@ Function Find-OnlineUpdate {
 		}
 
 		if ($isNewer) {
-			Write-Status "`n[!] New version available: $($response.tag_name)" -ForegroundColor Yellow -Important
-			Write-Status "    Download at: $($response.html_url)" -ForegroundColor Cyan -Important
-			Write-Host ""
-			Write-Host "Press Enter to continue..." -NoNewline -ForegroundColor Gray
-			$null = Read-Host
-			Write-Host ""
+			Write-Status "`n[!] New version available: $($response.tag_name). Downloading update..." -ForegroundColor Yellow -Important
+
+			try {
+				$installerAsset = $response.assets | Where-Object { $_.name -like "*Setup.exe" } | Select-Object -First 1
+
+				if ($installerAsset) {
+					$downloadUrl = $installerAsset.browser_download_url
+					$tempInstaller = Join-Path [System.IO.Path]::GetTempPath() $installerAsset.name
+
+					Invoke-WebRequest -Uri $downloadUrl -OutFile $tempInstaller -UseBasicParsing
+
+					Write-Status "Installing update in the background..." -ForegroundColor Cyan -Important
+
+					$installArgs = "/VERYSILENT /SUPPRESSMSGBOXES /FORCECLOSEAPPLICATIONS"
+
+					$cmdArgs = "/c timeout /t 3 /nobreak > NUL & `"$tempInstaller`" $installArgs"
+					Start-Process -FilePath "cmd.exe" -ArgumentList $cmdArgs -WindowStyle Hidden
+
+					exit
+				}
+				else {
+					Write-Status "Installer not found in the release assets. Please update manually at: $($response.html_url)" -ForegroundColor Red -Important
+					Start-Sleep -Seconds 3
+				}
+			}
+			catch {
+				Write-Log "Failed to download or execute the self-update: $($_.Exception.Message)"
+				Write-Status "Self-update failed. Please update manually at: $($response.html_url)" -ForegroundColor Red -Important
+				Start-Sleep -Seconds 3
+			}
 		}
 	}
 	catch {
