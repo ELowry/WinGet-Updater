@@ -280,10 +280,13 @@ Function Find-OnlineUpdate {
 					Invoke-WebRequest -Uri $downloadUrl -OutFile $tempInstaller -UseBasicParsing
 
 					Write-Status "Installing update in the background..." -ForegroundColor Cyan -Important
+					Write-Status "WinGet Updater will now close to apply the update. It will restart automatically." -ForegroundColor Yellow -Important
+					Start-Sleep -Seconds 2
 
+					$appLauncher = Join-Path $env:LOCALAPPDATA "WingetUpdater\launcher.bat"
 					$installArgs = "/VERYSILENT /SUPPRESSMSGBOXES /FORCECLOSEAPPLICATIONS"
 
-					$cmdArgs = "/c timeout /t 3 /nobreak > NUL & `"$tempInstaller`" $installArgs"
+					$cmdArgs = "/c timeout /t 3 /nobreak > NUL & start /wait `"`" `"$tempInstaller`" $installArgs & start `"`" /min `"$appLauncher`""
 					Start-Process -FilePath "cmd.exe" -ArgumentList $cmdArgs -WindowStyle Hidden
 
 					exit
