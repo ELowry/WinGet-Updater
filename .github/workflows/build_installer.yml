@@ -63,6 +63,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Compile Inno Setup Script
         uses: Minionguyjpro/Inno-Setup-Action@v1.2.8
@@ -99,7 +101,22 @@ jobs:
           } | Out-File -FilePath "checksums.txt" -Encoding utf8
           Write-Host "Checksums generated in checksums.txt"
 
+      - name: Generate Release Notes
+        shell: bash
+        run: |
+          PREV_TAG=$(git tag --sort=-creatordate | sed -n '2p')
+
+          if [ -n "$PREV_TAG" ]; then
+            git log ${PREV_TAG}..HEAD --pretty=format:"- %s" > generated_notes.txt
+          else
+            git log -5 --pretty=format:"- %s" > generated_notes.txt
+          fi
+
+          echo "" >> generated_notes.txt
+          echo "**Full Changelog:** https://github.com/${{ github.repository }}/compare/${PREV_TAG}...${{ github.ref_name }}" >> generated_notes.txt
+
       - name: Create Draft Release
+        id: create_release
         if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
         uses: softprops/action-gh-release@v3
         with:
@@ -108,4 +125,13 @@ jobs:
             WinGet-Updater.zip
             checksums.txt
           draft: true
-          generate_release_notes: true
+          body_path: generated_notes.txt
+
+      - name: Notify Discord
+        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+        uses: ELowry/discord-draft-notifier@v1
+        with:
+          webhook_url: ${{ secrets.DISCORD_WEBHOOK }}
+          version: ${{ github.ref_name }}
+          release_url: ${{ steps.create_release.outputs.url }}
+          notes_file_path: generated_notes.txt
