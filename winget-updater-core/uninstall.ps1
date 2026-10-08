@@ -53,8 +53,12 @@ if (Test-Path $LockFile) {
 		exit 1
 	}
 	else {
-		Write-Host "Overriding lock file as requested." -ForegroundColor Gray
+		Write-Host "Overriding lock file and terminating active processes..." -ForegroundColor Gray
 		Remove-Item $LockFile -Force -ErrorAction SilentlyContinue
+
+		Get-CimInstance Win32_Process -Filter "Name = 'powershell.exe'" | 
+		Where-Object { $_.CommandLine -match "winget-updater" -and $_.ProcessId -ne $PID } | 
+		Invoke-CimMethod -MethodName Terminate | Out-Null
 	}
 }
 
