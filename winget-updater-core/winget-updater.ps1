@@ -452,6 +452,8 @@ if (Test-Path $LogFile) {
 }
 
 $data = $null
+$bakFile = $DataFile -replace '\.json$', '.bak'
+
 if (Test-Path $DataFile) {
 	try {
 		$fileContent = Get-Content $DataFile -Raw -Encoding utf8
@@ -461,8 +463,21 @@ if (Test-Path $DataFile) {
 	}
 	catch {
 		$err = $_.Exception.Message
-		Write-UpdaterLog "Error reading or parsing data file $DataFile. A new one will be created. Error: $err"
-		$data = $null
+		Write-UpdaterLog "Error reading or parsing $DataFile. Attempting to load backup. Error: $err"
+	}
+}
+
+if ($null -eq $data -and (Test-Path $bakFile)) {
+	try {
+		$fileContent = Get-Content $bakFile -Raw -Encoding utf8
+		if (-not [string]::IsNullOrWhiteSpace($fileContent)) {
+			$data = $fileContent | ConvertFrom-Json
+			Write-UpdaterLog "Successfully recovered configuration from backup file."
+		}
+	}
+	catch {
+		$err = $_.Exception.Message
+		Write-UpdaterLog "Error reading or parsing backup file. A new configuration will be created. Error: $err"
 	}
 }
 
@@ -512,6 +527,12 @@ $hasValidData = ($whitelist.Count + $blocklist.Count + $forcelist.Count) -gt 0
 
 if (-not (Request-Lock -Forced:$Forced -Silent:$Silent)) {
 	exit
+}
+
+if (-not (Test-WinGetDependency)) {
+	if (-not $Silent -and -not $NoDelay) { Start-Sleep -Seconds 5 }
+	Clear-Lock
+	exit 1
 }
 
 # Register a handler to clear the lock if the script is manually interrupted (Ctrl+C)

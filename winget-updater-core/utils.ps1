@@ -184,7 +184,7 @@ Function Write-UpdaterLog {
 	Persists application state data atomically.
 
 .DESCRIPTION
-	Serializes state data to a temporary JSON file and replaces the destination file atomically.
+	Serializes state data to a temporary JSON file, backs up the existing data file, and replaces the destination file atomically.
 
 .PARAMETER DataToSave
 	The hashtable or object to serialize to JSON.
@@ -201,6 +201,12 @@ Function Save-Data {
 	$TempFile = [System.IO.Path]::GetTempFileName()
 	try {
 		$DataToSave | ConvertTo-Json -Depth 5 | Out-File -FilePath $TempFile -Encoding utf8
+
+		if (Test-Path $FilePath) {
+			$bakFile = $FilePath -replace '\.json$', '.bak'
+			Copy-Item -Path $FilePath -Destination $bakFile -Force -ErrorAction SilentlyContinue
+		}
+
 		Move-Item -Path $TempFile -Destination $FilePath -Force
 		Write-Status "Data saved successfully." -Type Info -ForegroundColor Green
 	}
@@ -679,4 +685,21 @@ Function Repair-RegistryVersionError {
 			exit
 		}
 	}
+}
+
+<#
+.SYNOPSIS
+	Verifies that winget.exe is available on the system.
+#>
+Function Test-WinGetDependency {
+	[CmdletBinding()]
+	param()
+
+	if (-not (Get-Command winget.exe -ErrorAction SilentlyContinue)) {
+		Write-UpdaterLog "Fatal Error: winget.exe was not found in the system PATH."
+		Write-Status "Error: 'winget' command is missing or corrupted." -ForegroundColor Red -Type Error -Important
+		Write-Status "Please ensure the Windows App Installer is installed." -ForegroundColor Yellow -Type Error -Important
+		return $false
+	}
+	return $true
 }

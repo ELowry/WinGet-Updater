@@ -18,6 +18,8 @@ param(
 . "$PSScriptRoot\utils.ps1" -EntryScriptPath $PSCommandPath
 
 $data = $null
+$bakFile = $DataFile -replace '\.json$', '.bak'
+
 if (Test-Path $DataFile) {
 	try {
 		$fileContent = Get-Content $DataFile -Raw -Encoding utf8
@@ -26,7 +28,20 @@ if (Test-Path $DataFile) {
 		}
 	}
 	catch {
-		Write-UpdaterLog "Warning: Failed to load data file. Starting fresh. Error: $($_.Exception.Message)"
+		Write-UpdaterLog "Error parsing $DataFile. Attempting to load backup. Error: $($_.Exception.Message)"
+	}
+}
+
+if ($null -eq $data -and (Test-Path $bakFile)) {
+	try {
+		$fileContent = Get-Content $bakFile -Raw -Encoding utf8
+		if (-not [string]::IsNullOrWhiteSpace($fileContent)) {
+			$data = $fileContent | ConvertFrom-Json
+			Write-UpdaterLog "Successfully recovered configuration from backup file."
+		}
+	}
+	catch {
+		Write-UpdaterLog "Warning: Failed to load backup data file. Starting fresh. Error: $($_.Exception.Message)"
 	}
 }
 
@@ -38,6 +53,11 @@ if ($lastRunDate.Date -eq (Get-Date).Date) {
 
 if (-not (Request-Lock -Silent)) {
 	exit
+}
+
+if (-not (Test-WinGetDependency)) {
+	Clear-Lock
+	exit 1
 }
 
 try {
