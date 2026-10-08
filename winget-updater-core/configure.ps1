@@ -118,8 +118,12 @@ try {
 			exit 1
 		}
 		else {
-			Write-Host "Overriding existing lock file as requested." -ForegroundColor Gray
+			Write-Host "Overriding lock file and terminating active processes..." -ForegroundColor Gray
 			Remove-Item $TargetLockFile -Force -ErrorAction SilentlyContinue
+
+			Get-CimInstance Win32_Process -Filter "Name = 'powershell.exe'" |
+			Where-Object { $_.CommandLine -match "winget-updater" -and $_.ProcessId -ne $PID } |
+			Invoke-CimMethod -MethodName Terminate | Out-Null
 		}
 	}
 
@@ -145,6 +149,7 @@ try {
 	if (Test-Path $InstallDir) {
 		Get-ChildItem -Path $InstallDir | Where-Object {
 			$_.Name -ne "winget-updater-data.json" -and
+			$_.Name -ne "winget-updater-data.bak" -and
 			$_.Name -ne "winget-updater-log.txt"
 		} | Remove-Item -Recurse -Force
 	}

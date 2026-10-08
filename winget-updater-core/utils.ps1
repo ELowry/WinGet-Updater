@@ -163,10 +163,17 @@ Function Write-UpdaterLog {
 	)
 	$Timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
 	try {
+		$bakFile = $LogFile -replace '\.txt$', '.bak'
+
+		if (Test-Path $bakFile) {
+			if ((Get-Item $bakFile).LastWriteTime -lt (Get-Date).AddDays(-30)) {
+				Remove-Item -Path $bakFile -Force -ErrorAction SilentlyContinue
+			}
+		}
+
 		if (Test-Path $LogFile) {
 			$logItem = Get-Item $LogFile
 			if ($logItem.Length -gt 2MB) {
-				$bakFile = $LogFile -replace '\.txt$', '.bak'
 				Move-Item -Path $LogFile -Destination $bakFile -Force -ErrorAction SilentlyContinue
 			}
 		}
@@ -176,7 +183,6 @@ Function Write-UpdaterLog {
 	catch {
 		Write-Status "Error logging message: $Message" -ForegroundColor Red -Type Error
 	}
-
 }
 
 <#
