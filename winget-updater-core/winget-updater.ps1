@@ -1,8 +1,38 @@
 <#
 .SYNOPSIS
-	WinGet Updater
+	WinGet Updater - An automated GUI and background service for keeping Windows applications up to date.
 	Copyright 2025 Eric Lowry
 	Licensed under the MIT License.
+
+.DESCRIPTION
+	WinGet Updater orchestrates the 'winget' command line tool to update software. 
+	It features an interactive UI for managing whitelists, blocklists, and forced updates, as well as a silent background mode intended for Scheduled Tasks.
+
+	Configuration state is saved locally to 'winget-updater-data.json'.
+
+.PARAMETER NoClear
+	Prevents the console from clearing when the script launches.
+
+.PARAMETER Silent
+	Runs the updater completely silently. Bypasses all user prompts, UI menus, and countdowns.
+	Used primarily by the scheduled background task.
+
+.PARAMETER Minimal
+	Suppresses non-essential informational console output, showing only errors and important prompts.
+
+.PARAMETER NoDelay
+	Skips the 3-second exit delay at the end of the script.
+
+.PARAMETER Forced
+	Bypasses the 2-hour lock file check. Use with caution.
+
+.PARAMETER CachePath
+	Path to a JSON file containing pre-fetched WinGet updates (used to speed up handoffs from the scheduled task).
+
+.NOTES
+	Advanced Configuration - GitHub API Rate Limits:
+	To bypass the 60 requests/hour unauthenticated GitHub API limit for self-updates, create a text file named 'github-token-env.txt' in the script directory.
+	Inside this file, write the NAME of a Windows Environment Variable that holds your GitHub Personal Access Token (e.g., GITHUB_PAT).
 #>
 
 [CmdletBinding()]

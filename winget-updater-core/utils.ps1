@@ -223,7 +223,21 @@ Function Clear-Lock {
 	}
 }
 
-
+<#
+.SYNOPSIS
+	Checks the GitHub API for newer releases of the WinGet Updater application.
+.DESCRIPTION
+	Queries the latest release tag from the project's GitHub repository.
+	If a newer version is found, it silently downloads the InnoSetup executable, triggers a background update, and forcefully closes the current instance.
+.PARAMETER CurrentVersion
+	The currently running version of the application (e.g., '1.5.3').
+.PARAMETER RepoOwner
+	The GitHub username of the repository owner.
+.PARAMETER RepoName
+	The repository name to check.
+.NOTES
+	This function checks for a 'github-token-env.txt' file in the script root to inject an authenticated Bearer token, bypassing standard IP-based rate limits.
+#>
 Function Find-OnlineUpdate {
 	param(
 		[string]$CurrentVersion,
@@ -237,7 +251,25 @@ Function Find-OnlineUpdate {
 
 	try {
 		$apiUrl = "https://api.github.com/repos/$RepoOwner/$RepoName/releases/latest"
-		$response = Invoke-RestMethod -Uri $apiUrl -Method Get -TimeoutSec 3 -ErrorAction Stop
+		$headers = @{
+			"Accept" = "application/vnd.github.v3+json"
+		}
+
+		$envConfigFile = Join-Path $PSScriptRoot "github-token-env.txt"
+		if (Test-Path $envConfigFile) {
+			$envVarName = (Get-Content $envConfigFile -Raw).Trim()
+			if (-not [string]::IsNullOrWhiteSpace($envVarName)) {
+				$token = [Environment]::GetEnvironmentVariable($envVarName)
+				if (-not [string]::IsNullOrWhiteSpace($token)) {
+					$headers["Authorization"] = "Bearer $token"
+				}
+				else {
+					Write-UpdaterLog "GitHub PAT environment variable '$envVarName' was specified but is empty or not found."
+				}
+			}
+		}
+
+		$response = Invoke-RestMethod -Uri $apiUrl -Method Get -Headers $headers -TimeoutSec 3 -ErrorAction Stop
 
 		if ($null -eq $response -or $null -eq $response.tag_name) {
 			return
@@ -283,15 +315,15 @@ Function Find-OnlineUpdate {
 
 				if ($installerAsset) {
 					$downloadUrl = $installerAsset.browser_download_url
-					$tempInstaller = Join-Path ([System.IO.Path]::GetTempPath()) $installerAsset.name
+					$tempInstaller = Join-Path ([System.IO.Path]::GetTempPath())$installerAsset.name
 
-					Invoke-WebRequest -Uri $downloadUrl -OutFile $tempInstaller -UseBasicParsing
+					Invoke-WebRequest -Uri $downloadUrl -OutFile$tempInstaller -UseBasicParsing
 
 					Write-Status "Installing update in the background..." -ForegroundColor Cyan -Important
 					Write-Status "WinGet Updater will now close to apply the update. It will restart automatically." -ForegroundColor Yellow -Important
 					Start-Sleep -Seconds 2
 
-					$appLauncher = Join-Path $PSScriptRoot "launcher.bat"
+					$appLauncher = Join-Path$PSScriptRoot "launcher.bat"
 					$installArgs = "/VERYSILENT /SUPPRESSMSGBOXES /FORCECLOSEAPPLICATIONS"
 
 					$cmdArgs = "/c timeout /t 3 /nobreak > NUL & start /wait `"`" `"$tempInstaller`" $installArgs & start `"`" /min `"$appLauncher`""
