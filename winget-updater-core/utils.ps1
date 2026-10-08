@@ -291,7 +291,7 @@ Function Find-OnlineUpdate {
 					Write-Status "WinGet Updater will now close to apply the update. It will restart automatically." -ForegroundColor Yellow -Important
 					Start-Sleep -Seconds 2
 
-					$appLauncher = Join-Path $env:LOCALAPPDATA "WingetUpdater\launcher.bat"
+					$appLauncher = Join-Path $PSScriptRoot "launcher.bat"
 					$installArgs = "/VERYSILENT /SUPPRESSMSGBOXES /FORCECLOSEAPPLICATIONS"
 
 					$cmdArgs = "/c timeout /t 3 /nobreak > NUL & start /wait `"`" `"$tempInstaller`" $installArgs & start `"`" /min `"$appLauncher`""

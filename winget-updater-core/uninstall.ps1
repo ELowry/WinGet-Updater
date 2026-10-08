@@ -8,23 +8,27 @@
 [CmdletBinding()]
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSAvoidUsingWriteHost", "")]
 param(
-	[switch]$Forced
+	[switch]$Forced,
+	[string]$TargetLocalAppData = $env:LOCALAPPDATA,
+	[string]$TargetAppData = $env:APPDATA
 )
 
 $AppName = "Winget Updater"
-$InstallDir = "$env:LOCALAPPDATA\WingetUpdater"
-$StartMenuLink = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\$AppName.lnk"
-$StartMenuFolder = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\$AppName"
+$InstallDir = "$TargetLocalAppData\WingetUpdater"
+$StartMenuLink = "$TargetAppData\Microsoft\Windows\Start Menu\Programs\$AppName.lnk"
+$StartMenuFolder = "$TargetAppData\Microsoft\Windows\Start Menu\Programs\$AppName"
 $TaskName = "Winget Updater"
 $RegistryKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\WingetUpdater"
 
 if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
-	# Try to use Windows Terminal if available
+	$argsList = "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" -TargetLocalAppData `"$TargetLocalAppData`" -TargetAppData `"$TargetAppData`""
+	if ($Forced) { $argsList += " -Forced" }
+
 	if (Get-Command wt.exe -ErrorAction SilentlyContinue) {
-		Start-Process wt.exe -ArgumentList "-w new powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs
+		Start-Process wt.exe -ArgumentList "-w new powershell.exe $argsList" -Verb RunAs
 	}
 	else {
-		Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs
+		Start-Process powershell.exe -ArgumentList $argsList -Verb RunAs
 	}
 	exit
 }
