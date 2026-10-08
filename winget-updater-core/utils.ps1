@@ -386,8 +386,12 @@ Function Find-OnlineUpdate {
 
 		$envConfigFile = Join-Path $PSScriptRoot "github-token-env.txt"
 		if (Test-Path $envConfigFile) {
-			$envVarName = (Get-Content $envConfigFile -Raw).Trim()
-			if (-not [string]::IsNullOrWhiteSpace($envVarName)) {
+			$envVarName = Get-Content $envConfigFile | 
+				Where-Object { -not [string]::IsNullOrWhiteSpace($_) -and $_.Trim() -notmatch '^#' } | 
+				Select-Object -First 1
+
+			if ($null -ne $envVarName) {
+				$envVarName = $envVarName.Trim()
 				$token = [Environment]::GetEnvironmentVariable($envVarName)
 				if (-not [string]::IsNullOrWhiteSpace($token)) {
 					$headers["Authorization"] = "Bearer $token"

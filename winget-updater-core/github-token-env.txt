@@ -1,0 +1,3 @@
+# To bypass GitHub API rate limits during self-updates, you can provide a Personal Access Token.
+# Enter the NAME of the Windows Environment Variable that contains your token below.
+# Example: GITHUB_BASIC_TOKEN

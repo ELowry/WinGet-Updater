@@ -39,6 +39,7 @@ Source: "..\winget-updater-core\uninstall.ps1"; DestDir: "{tmp}"; Flags: ignorev
 Source: "..\winget-updater-core\launcher.bat"; DestDir: "{tmp}"; Flags: ignoreversion
 Source: "..\winget-updater-core\silent.vbs"; DestDir: "{tmp}"; Flags: ignoreversion
 Source: "..\winget-updater-core\winget-updater.ico"; DestDir: "{tmp}"; Flags: ignoreversion
+Source: "..\winget-updater-core\github-token-env.txt"; DestDir: "{tmp}"; Flags: ignoreversion
 
 [Tasks]
 Name: "startup"; Description: "Run automatically at system startup"; GroupDescription: "Automation:"

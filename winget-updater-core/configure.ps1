@@ -150,7 +150,8 @@ try {
 		Get-ChildItem -Path $InstallDir | Where-Object {
 			$_.Name -ne "winget-updater-data.json" -and
 			$_.Name -ne "winget-updater-data.bak" -and
-			$_.Name -ne "winget-updater-log.txt"
+			$_.Name -ne "winget-updater-log.txt" -and
+			$_.Name -ne "github-token-env.txt"
 		} | Remove-Item -Recurse -Force
 	}
 
@@ -166,6 +167,9 @@ try {
 	}
 	elseif (Test-Path "$SourceDir\..\installer\version.isi") {
 		Copy-Item -Path "$SourceDir\..\installer\version.isi" -Destination "$InstallDir\version.isi" -Force
+	}
+	if (-not (Test-Path "$InstallDir\github-token-env.txt") -and (Test-Path "$SourceDir\github-token-env.txt")) {
+		Copy-Item -Path "$SourceDir\github-token-env.txt" -Destination $InstallDir -Force
 	}
 
 	Write-Host "Setting up shortcuts..." -ForegroundColor Yellow
