@@ -97,6 +97,14 @@ Function Write-UpdaterLog {
 	)
 	$Timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
 	try {
+		if (Test-Path $LogFile) {
+			$logItem = Get-Item $LogFile
+			if ($logItem.Length -gt 2MB) {
+				$bakFile = $LogFile -replace '\.txt$', '.bak'
+				Move-Item -Path $LogFile -Destination $bakFile -Force -ErrorAction SilentlyContinue
+			}
+		}
+
 		"[$Timestamp] $Message" | Out-File -FilePath $LogFile -Append -ErrorAction SilentlyContinue
 	}
 	catch {
