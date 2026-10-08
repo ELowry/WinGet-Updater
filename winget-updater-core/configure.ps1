@@ -3,7 +3,27 @@
 	Installer and Configurator for Winget Updater
 	Copyright 2025 Eric Lowry
 	Licensed under the MIT License.
+
+.DESCRIPTION
+	Installs, updates, or configures the Winget Updater application.
+	Copies core script files to LocalAppData, creates Start Menu shortcuts, registers the uninstaller in the Windows registry, and sets up scheduled tasks.
+
+.PARAMETER Unattended
+	Runs the configuration without interactive prompts, using provided switches or stored defaults.
+
+.PARAMETER EnableStartup
+	Configures scheduled task trigger to run updater at user logon.
+
+.PARAMETER EnableWake
+	Configures scheduled task trigger to run updater on session unlock or system resume.
+
+.PARAMETER InstallOnly
+	Configures the scheduled task to execute updates silently for packages marked as Always Run.
+
+.PARAMETER Forced
+	Bypasses any active instance lock file check during installation or setup.
 #>
+[CmdletBinding()]
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSAvoidUsingWriteHost", "")]
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSUseBOMForUnicodeEncodedFile", "")]
 param(
@@ -16,8 +36,25 @@ param(
 
 $ConfigRegPath = "HKCU:\Software\EricLowry\WingetUpdater\Config"
 
+<#
+.SYNOPSIS
+	Retrieves a configuration value from the registry.
+
+.DESCRIPTION
+	Queries the Winget Updater configuration registry key for a specified value name.
+	Returns the fallback default value if the key or value does not exist.
+
+.PARAMETER Name
+	The name of the registry property to read.
+
+.PARAMETER Default
+	The default value returned if the property is missing or unreadable.
+#>
 function Get-ConfigValue {
-	param([string]$Name, $Default)
+	param(
+		[string]$Name,
+		[object]$Default
+	)
 	try {
 		if (Test-Path $ConfigRegPath) {
 			$value = Get-ItemProperty -Path $ConfigRegPath -Name $Name -ErrorAction SilentlyContinue | Select-Object -ExpandProperty $Name
@@ -32,9 +69,25 @@ function Get-ConfigValue {
 	return $Default
 }
 
+<#
+.SYNOPSIS
+	Sets a configuration value in the registry.
+
+.DESCRIPTION
+	Creates the configuration registry key if missing and sets the specified property value.
+
+.PARAMETER Name
+	The name of the registry property to set.
+
+.PARAMETER Value
+	The value to store in the configuration registry.
+#>
 function Set-ConfigValue {
 	[CmdletBinding(SupportsShouldProcess)]
-	param([string]$Name, $Value)
+	param(
+		[string]$Name,
+		[object]$Value
+	)
 	if (-not (Test-Path $ConfigRegPath)) {
 		# Create parent keys if they don't exist
 		$parentPath = "HKCU:\Software\EricLowry"

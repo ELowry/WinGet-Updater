@@ -5,7 +5,7 @@
 	Licensed under the MIT License.
 
 .DESCRIPTION
-	WinGet Updater orchestrates the 'winget' command line tool to update software. 
+	WinGet Updater orchestrates the 'winget' command line tool to update software.
 	It features an interactive UI for managing whitelists, blocklists, and forced updates, as well as a silent background mode intended for Scheduled Tasks.
 
 	Configuration state is saved locally to 'winget-updater-data.json'.
@@ -50,7 +50,17 @@ param(
 
 $AppVersion = Get-AppVersion
 
+<#
+.SYNOPSIS
+	Renders the application banner header.
+
+.DESCRIPTION
+	Outputs the ASCII banner and title bar to the console unless running in silent mode.
+#>
 Function Show-Header {
+	[CmdletBinding()]
+	param()
+
 	if (-not $Silent) {
 		Write-Host "============================" -ForegroundColor Cyan
 		Write-Host "       WINGET UPDATER       " -ForegroundColor White
@@ -59,12 +69,32 @@ Function Show-Header {
 	}
 }
 
+<#
+.SYNOPSIS
+	Interactive management menu for tracked packages.
+
+.DESCRIPTION
+	Displays a listing of managed packages across whitelists, blocklists, and forcelists, enabling the user to modify rule assignments or custom argument options.
+
+.PARAMETER Whitelist
+	List of package IDs marked to run by default.
+
+.PARAMETER Blocklist
+	List of package IDs blocked from updating.
+
+.PARAMETER Forcelist
+	List of package IDs configured to always update.
+
+.PARAMETER PackageOptions
+	Dictionary or hashtable mapping package IDs to custom command-line arguments.
+#>
 Function Show-EditMode {
+	[CmdletBinding()]
 	param (
 		[System.Collections.ArrayList]$Whitelist,
 		[System.Collections.ArrayList]$Blocklist,
 		[System.Collections.ArrayList]$Forcelist,
-		$PackageOptions
+		[object]$PackageOptions
 	)
 
 	Clear-Host
@@ -200,11 +230,28 @@ Function Show-EditMode {
 	}
 }
 
+<#
+.SYNOPSIS
+	Prompts the user to select update actions for pending packages.
+
+.DESCRIPTION
+	Iterates through available updates and prompts the user to select an action (Run, Always run, Skip, Block, or Options) for each package.
+
+.PARAMETER Updates
+	List of update objects returned by Get-WinGetUpdate.
+
+.PARAMETER Whitelist
+	List of package IDs currently marked to run by default.
+
+.PARAMETER PackageOptions
+	Dictionary or hashtable mapping package IDs to custom command-line arguments.
+#>
 Function Show-UpdateMenu {
+	[CmdletBinding()]
 	param (
 		[System.Collections.ArrayList]$Updates,
 		[System.Collections.ArrayList]$Whitelist,
-		$PackageOptions
+		[object]$PackageOptions
 	)
 
 	$choices = @{}
@@ -237,7 +284,7 @@ Function Show-UpdateMenu {
 		Write-Host "  $($update.Version) -> $($update.AvailableVersion)" -ForegroundColor DarkGray
 
 		$isUnknownVersion = $update.Version -eq 'Unknown'
-		
+
 		$promptPrefix = "  Choose action: [R]un"
 		$validChoices = @('r', 's', 'b', 'o')
 
@@ -245,7 +292,7 @@ Function Show-UpdateMenu {
 			$promptPrefix += ", [A]lways run"
 			$validChoices += 'a'
 		}
-		
+
 		$prompt = "$promptPrefix, [S]kip, [B]lock, [O]ptions (Default is '$defaultWord')"
 
 		if ($isUnknownVersion) {
@@ -319,14 +366,41 @@ Function Show-UpdateMenu {
 	return $choices
 }
 
+<#
+.SYNOPSIS
+	Initiates a countdown timer allowing user intervention.
+
+.DESCRIPTION
+	Waits for a specified duration while monitoring keyboard input.
+	Allows interrupting into edit mode by pressing 'E' or skipping the delay with Enter.
+
+.PARAMETER Seconds
+	Number of seconds to wait before auto-proceeding.
+
+.PARAMETER Message
+	Prompt message displayed above the countdown.
+
+.PARAMETER Whitelist
+	List of package IDs marked to run by default.
+
+.PARAMETER Blocklist
+	List of package IDs blocked from updating.
+
+.PARAMETER Forcelist
+	List of package IDs configured to always update.
+
+.PARAMETER PackageOptions
+	Dictionary or hashtable mapping package IDs to custom command-line arguments.
+#>
 Function Invoke-Countdown {
+	[CmdletBinding()]
 	param(
 		[int]$Seconds,
 		[string]$Message,
 		[System.Collections.ArrayList]$Whitelist,
 		[System.Collections.ArrayList]$Blocklist,
 		[System.Collections.ArrayList]$Forcelist,
-		$PackageOptions
+		[object]$PackageOptions
 	)
 
 	Write-Host "$Message" -ForegroundColor Yellow

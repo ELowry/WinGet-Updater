@@ -3,6 +3,18 @@
 	Uninstall Winget Updater
 	Copyright 2025 Eric Lowry
 	Licensed under the MIT License.
+
+.DESCRIPTION
+	Removes Winget Updater installation files, scheduled tasks, registry entries, and Start Menu shortcuts.
+
+.PARAMETER Forced
+	Overrides any active instance lock file and proceeds with uninstallation.
+
+.PARAMETER TargetLocalAppData
+	The target LocalAppData path where application files are located. Defaults to $env:LOCALAPPDATA.
+
+.PARAMETER TargetAppData
+	The target AppData path where Start Menu shortcuts are located. Defaults to $env:APPDATA.
 #>
 
 [CmdletBinding()]

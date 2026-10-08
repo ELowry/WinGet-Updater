@@ -3,7 +3,14 @@
 	WinGet Updater - Scheduled Task Runner
 	Copyright 2025 Eric Lowry
 	Licensed under the MIT License.
+
+.DESCRIPTION
+	Executes as a background scheduled task runner to query available WinGet updates, evaluate configured package rules (whitelists, blocklists, forcelists), and hand off execution to winget-updater.ps1 either silently or via an interactive terminal window.
+
+.PARAMETER Silent
+	Runs the updater process silently in the background, suppressing terminal window launching.
 #>
+[CmdletBinding()]
 param(
 	[switch]$Silent
 )

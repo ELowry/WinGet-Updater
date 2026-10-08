@@ -3,7 +3,15 @@
 	WinGet Updater - Shared Utilities
 	Copyright 2025 Eric Lowry
 	Licensed under the MIT License.
+
+.DESCRIPTION
+	Provides shared functions, concurrency lock management, configuration persistence,
+	release checking, and registry repair routines for WinGet Updater.
+
+.PARAMETER EntryScriptPath
+	The full path to the calling entry-point script, used when relaunching elevated.
 #>
+[CmdletBinding()]
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSAvoidUsingWriteHost", "")]
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSUseDeclaredVarsMoreThanAssignments", "")]
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSReviewUnusedParameter", "")]
@@ -15,7 +23,18 @@ $DataFile = Join-Path $PSScriptRoot "winget-updater-data.json"
 $LogFile = Join-Path $PSScriptRoot "winget-updater-log.txt"
 $LockFile = Join-Path $PSScriptRoot "winget-updater.lock"
 
+<#
+.SYNOPSIS
+	Retrieves the current application version.
+
+.DESCRIPTION
+	Reads the application version string defined in version.isi located either in the script directory
+	or the installer directory.
+#>
 Function Get-AppVersion {
+	[CmdletBinding()]
+	param()
+
 	$versionFilePath = if (Test-Path "$PSScriptRoot\version.isi") {
 		"$PSScriptRoot\version.isi"
 	}
@@ -37,8 +56,21 @@ Function Get-AppVersion {
 	}
 }
 
+<#
+.SYNOPSIS
+	Parses the last run timestamp from application state.
+
+.DESCRIPTION
+	Extracts and converts the LastRun timestamp from the configuration object into a DateTime value.
+
+.PARAMETER Data
+	The application state object loaded from the JSON data file.
+#>
 Function Get-LastRunDate {
-	param([psobject]$Data)
+	[CmdletBinding()]
+	param(
+		[psobject]$Data
+	)
 
 	if ($null -eq $Data) {
 		return [DateTime]::MinValue
@@ -63,12 +95,35 @@ Function Get-LastRunDate {
 	}
 }
 
+<#
+.SYNOPSIS
+	Outputs formatted status messages to the console.
+
+.DESCRIPTION
+	Displays color-coded status messages respecting $Silent and $Minimal switches.
+
+.PARAMETER Message
+	The text string to display.
+
+.PARAMETER ForegroundColor
+	The console text color to use.
+
+.PARAMETER NoNewline
+	Suppresses the trailing newline when writing to the console.
+
+.PARAMETER Type
+	The message classification category ('Info' or 'Error').
+
+.PARAMETER Important
+	Forces output display even when running in minimal output mode.
+#>
 Function Write-Status {
+	[CmdletBinding()]
 	param(
 		[string]$Message,
 		[ConsoleColor]$ForegroundColor = "White",
 		[switch]$NoNewline,
-		[string]$Type = "Info", # 'Info' or 'Error'
+		[string]$Type = "Info",
 		[switch]$Important
 	)
 
@@ -91,7 +146,18 @@ Function Write-Status {
 	}
 }
 
+<#
+.SYNOPSIS
+	Appends timestamped messages to the log file.
+
+.DESCRIPTION
+	Writes an event entry to the log file, automatically rotating the log file if it exceeds 2 MB.
+
+.PARAMETER Message
+	The log message text to record.
+#>
 Function Write-UpdaterLog {
+	[CmdletBinding()]
 	param(
 		[string]$Message
 	)
@@ -113,7 +179,21 @@ Function Write-UpdaterLog {
 
 }
 
+<#
+.SYNOPSIS
+	Persists application state data atomically.
+
+.DESCRIPTION
+	Serializes state data to a temporary JSON file and replaces the destination file atomically.
+
+.PARAMETER DataToSave
+	The hashtable or object to serialize to JSON.
+
+.PARAMETER FilePath
+	The target path where the JSON data file will be saved.
+#>
 Function Save-Data {
+	[CmdletBinding()]
 	param(
 		[psobject]$DataToSave,
 		[string]$FilePath
@@ -135,8 +215,21 @@ Function Save-Data {
 	}
 }
 
+<#
+.SYNOPSIS
+	Splits a command-line argument string into an array of arguments.
+
+.DESCRIPTION
+	Parses a string into arguments while respecting double-quoted segments.
+
+.PARAMETER InputString
+	The argument string to parse.
+#>
 Function Split-ArgumentList {
-	param([string]$InputString)
+	[CmdletBinding()]
+	param(
+		[string]$InputString
+	)
 	if ([string]::IsNullOrWhiteSpace($InputString)) {
 		return @()
 	}
@@ -155,7 +248,21 @@ Function Split-ArgumentList {
 	return $argsList
 }
 
+<#
+.SYNOPSIS
+	Acquires the application execution lock.
+
+.DESCRIPTION
+	Checks for the existence and age of the lock file. Prompts the user if an active instance appears to be running unless overridden by parameters.
+
+.PARAMETER Forced
+	Overrides an existing lock file unconditionally.
+
+.PARAMETER Silent
+	Suppresses user prompts when a lock file conflict is detected.
+#>
 Function Request-Lock {
+	[CmdletBinding()]
 	param(
 		[switch]$Forced,
 		[switch]$Silent
@@ -169,8 +276,8 @@ Function Request-Lock {
 					throw "Lock file is empty."
 				}
 				$lockTime = [DateTime]::Parse(
-					$lockContent.Trim(), 
-					[System.Globalization.CultureInfo]::InvariantCulture, 
+					$lockContent.Trim(),
+					[System.Globalization.CultureInfo]::InvariantCulture,
 					[System.Globalization.DateTimeStyles]::RoundtripKind
 				)
 				if ((Get-Date) -lt $lockTime.AddHours(2)) {
@@ -217,7 +324,17 @@ Function Request-Lock {
 	}
 }
 
+<#
+.SYNOPSIS
+	Releases the application execution lock.
+
+.DESCRIPTION
+	Removes the lock file from the script directory if present.
+#>
 Function Clear-Lock {
+	[CmdletBinding()]
+	param()
+
 	if (Test-Path $LockFile) {
 		Remove-Item $LockFile -Force -ErrorAction SilentlyContinue
 	}
@@ -348,7 +465,18 @@ Function Find-OnlineUpdate {
 	}
 }
 
+<#
+.SYNOPSIS
+	Queries WinGet for available package updates.
+
+.DESCRIPTION
+	Updates WinGet package sources, executes 'winget upgrade --include-unknown',
+	and parses output tables into structured update objects.
+#>
 Function Get-WinGetUpdate {
+	[CmdletBinding()]
+	param()
+
 	Repair-RegistryVersionError
 
 	Write-Status "Checking for available updates..." -Type Info -ForegroundColor Yellow
@@ -441,7 +569,19 @@ Function Get-WinGetUpdate {
 	}
 }
 
+<#
+.SYNOPSIS
+	Repairs missing DisplayVersion entries in Windows registry uninstall keys.
+
+.DESCRIPTION
+	Inspects machine and user uninstall registry keys for installed applications
+	where DisplayVersion is empty but Version or Inno Setup version keys exist.
+	Populates DisplayVersion so WinGet can match and update packages.
+#>
 Function Repair-RegistryVersionError {
+	[CmdletBinding()]
+	param()
+
 	if ($Unattended) {
 		return
 	}
@@ -508,7 +648,7 @@ Function Repair-RegistryVersionError {
 		Write-Host "Do you want to relaunch as Administrator to fix this automatically? (y/N): " -NoNewline -ForegroundColor Yellow
 		$response = Read-Host
 		if ($response.ToLower() -eq 'y') {
-			$mainScript = $EntryScriptPath 
+			$mainScript = $EntryScriptPath
 
 			$params = @()
 			$possibleParams = @("NoClear", "Silent", "Minimal", "NoDelay", "Forced", "CachePath")
