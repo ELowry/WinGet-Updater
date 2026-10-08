@@ -1,6 +1,6 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-3d383b.svg)](LICENSE) [![Latest GitHub release](https://img.shields.io/github/v/release/ELowry/WinGet-Updater?logo=GitHub&color=a4785e)](https://github.com/ELowry/WinGet-Updater/releases/latest)
 
-# [![Winget Updater](WinGetUpdater.jpg)](#)
+# [![Winget Updater](WinGetUpdater.jpg)](https://github.com/ELowry/WinGet-Updater)
 
 **Effortless, automated updates for your Windows apps.**
 
