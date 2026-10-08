@@ -77,32 +77,33 @@ try {
 	$tempCache = [System.IO.Path]::GetTempFileName()
 	$updates | ConvertTo-Json -Depth 5 | Out-File -FilePath $tempCache -Encoding utf8
 
+	$keepLock = $false
+
 	if ($Silent) {
 		Write-UpdaterLog "Scheduled check found $($actionableUpdates.Count) actionable updates. Launching in Silent Mode."
-		Start-Process "powershell.exe" -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSScriptRoot\winget-updater.ps1`" -Minimal -Forced -Silent -CachePath `"$tempCache`"" -WindowStyle Hidden
+		Start-Process "powershell.exe" -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSScriptRoot\winget-updater.ps1`" -Minimal -Forced -Silent -CachePath `"$tempCache`"" -WindowStyle Hidden -ErrorAction Stop
+		$keepLock = $true
 	}
 	else {
 		Write-UpdaterLog "Scheduled check found $($actionableUpdates.Count) actionable updates. Launching UI."
 
 		if (Get-Command wt.exe -ErrorAction SilentlyContinue) {
-			Start-Process "wt.exe" -ArgumentList "-w new powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$PSScriptRoot\winget-updater.ps1`" -Minimal -Forced -CachePath `"$tempCache`"" -WindowStyle Normal
+			Start-Process "wt.exe" -ArgumentList "-w new powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$PSScriptRoot\winget-updater.ps1`" -Minimal -Forced -CachePath `"$tempCache`"" -WindowStyle Normal -ErrorAction Stop
+			$keepLock = $true
 		}
 		else {
-			Start-Process "powershell.exe" -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSScriptRoot\winget-updater.ps1`" -Minimal -Forced -CachePath `"$tempCache`"" -WindowStyle Normal
+			Start-Process "powershell.exe" -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSScriptRoot\winget-updater.ps1`" -Minimal -Forced -CachePath `"$tempCache`"" -WindowStyle Normal -ErrorAction Stop
+			$keepLock = $true
 		}
 	}
 
 }
 catch {
-	Write-UpdaterLog "Error during scheduled update check: $($_.Exception.Message)"
+	Write-UpdaterLog "Error during scheduled update check or handoff: $($_.Exception.Message)"
 }
 finally {
-	# Only clear if we didn't hand off to the UI (indicated by actionableUpdates count)
-	if ($null -ne $actionableUpdates -and $actionableUpdates.Count -eq 0) {
-		Clear-Lock
-	}
-	elseif ($null -eq $actionableUpdates) {
-		# If we crashed before even defining the variable
+	# Only clear the lock if the handoff did not successfully complete
+	if (-not $keepLock) {
 		Clear-Lock
 	}
 }
